@@ -18,5 +18,6 @@
 		"25",
 		"-w",
 		"networks/elf_converted_05dbca15"
-	]
+	],
+	"timeout_seconds": 2
 }
