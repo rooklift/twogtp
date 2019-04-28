@@ -4,20 +4,24 @@
 	"engine_1_args": [
 		"--gtp",
 		"--noponder",
-		"-p",
-		"25",
 		"-w",
 		"networks/better_192_163e407b"
 	],
+	"engine_1_commands": [
+		"time_settings 0 11 1"
+	],
+
 	"engine_2_name": "Elf (via LZ)",
 	"engine_2_path": "../../../../../Programs (self-installed)/Leela Zero/leelaz.exe",
 	"engine_2_args": [
 		"--gtp",
 		"--noponder",
-		"-p",
-		"25",
 		"-w",
 		"networks/elf_converted_05dbca15"
 	],
-	"timeout_seconds": 2
+	"engine_2_commands": [
+		"time_settings 0 11 1"
+	],
+
+	"timeout_seconds": 30
 }

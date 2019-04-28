@@ -20,10 +20,12 @@ type ConfigStruct struct {
 	Engine1Name			string				`json:"engine_1_name"`
 	Engine1Path			string				`json:"engine_1_path"`
 	Engine1Args			[]string			`json:"engine_1_args"`
+	Engine1Commands		[]string			`json:"engine_1_commands"`
 
 	Engine2Name			string				`json:"engine_2_name"`
 	Engine2Path			string				`json:"engine_2_path"`
 	Engine2Args			[]string			`json:"engine_2_args"`
+	Engine2Commands		[]string			`json:"engine_2_commands"`
 
 	Timeout				time.Duration		`json:"timeout_seconds"`		// Note: at load, is multiplied by time.Second so it's stored as a sane duration.
 }
@@ -59,18 +61,21 @@ type Engine struct {
 	name		string			// For the SGF
 	dir			string
 	base		string
+
 	args		[]string		// Not including base
+	commands	[]string		// GTP commands to be sent at start, e.g. time limit
 
 	wins		int
 	losses		int
 	unknowns	int
 }
 
-func (self *Engine) Start(name, path string, args []string) {
+func (self *Engine) Start(name, path string, args []string, commands []string) {
 
 	self.name = name
 	self.dir = filepath.Dir(path)
 	self.base = filepath.Base(path)
+	self.commands = commands
 
 	for _, a := range args {
 		self.args = append(self.args, a)
@@ -139,10 +144,12 @@ func (self *Engine) SendAndReceive(msg string) (string, error) {
 
 func main() {
 
+	KillTime <- time.Now().Add(2 * time.Minute)		// 2 minute grace period to start up.
+
 	a := new(Engine)
 	b := new(Engine)
-	a.Start(Config.Engine1Name, Config.Engine1Path, Config.Engine1Args)
-	b.Start(Config.Engine2Name, Config.Engine2Path, Config.Engine2Args)
+	a.Start(Config.Engine1Name, Config.Engine1Path, Config.Engine1Args, Config.Engine1Commands)
+	b.Start(Config.Engine2Name, Config.Engine2Path, Config.Engine2Args, Config.Engine2Commands)
 
 	engines := map[sgf.Colour]*Engine{sgf.BLACK: a, sgf.WHITE: b}
 
@@ -174,6 +181,10 @@ func play_game(engines map[sgf.Colour]*Engine) error {
 		engine.SendAndReceive("boardsize 19")
 		engine.SendAndReceive("komi 7.5")
 		engine.SendAndReceive("clear_board")
+
+		for _, command := range engine.commands {
+			engine.SendAndReceive(command)
+		}
 	}
 
 	last_save_time := time.Now()
