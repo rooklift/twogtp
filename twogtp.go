@@ -130,9 +130,14 @@ func (self *Engine) SendAndReceive(msg string) (string, error) {
 
 		if self.stdout.Text() == "" {
 
+			s := response.String()
+
+			if len(s) > 0 && s[0] == '?' {
+				return "", fmt.Errorf("SendAndReceive(): got reply: %s", strings.TrimSpace(s))
+			}
+
 			// Return everything except the leading ID thing...
 
-			s := response.String()
 			i := 0
 
 			for i < len(s) && (s[i] == '=' || s[i] >= '0' && s[i] <= '9') {
@@ -205,12 +210,15 @@ func play_game() error {
 	for {
 		colour = colour.Opposite()
 
+		engine := Engines[colour]
+		other_engine := Engines[colour.Opposite()]
+
 		if time.Now().Sub(last_save_time) > 5 * time.Second {
 			node.Save(outfilename)
 			last_save_time = time.Now()
 		}
 
-		move, err := Engines[colour].SendAndReceive(fmt.Sprintf("genmove %s", colour.Lower()))
+		move, err := engine.SendAndReceive(fmt.Sprintf("genmove %s", colour.Lower()))
 
 		fmt.Printf(move + " ")
 
@@ -218,21 +226,21 @@ func play_game() error {
 
 		if err != nil {
 			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
-			Engines[colour].losses++
-			Engines[colour.Opposite()].wins++
+			engine.losses++
+			other_engine.wins++
 			final_error = err						// Set the error to return to caller.
 			break
 		} else if move == "resign" {
 			root.SetValue("RE", fmt.Sprintf("%s+R", colour.Opposite().Upper()))
-			Engines[colour].losses++
-			Engines[colour.Opposite()].wins++
+			engine.losses++
+			other_engine.wins++
 			break
 		} else if move == "pass" {
 			passes_in_a_row++
 			node = node.PassColour(colour)
 			if passes_in_a_row >= 3 {
-				Engines[colour].unknowns++
-				Engines[colour.Opposite()].unknowns++
+				engine.unknowns++
+				other_engine.unknowns++
 				break
 			}
 		} else {
@@ -240,17 +248,24 @@ func play_game() error {
 			node, err = node.PlayMoveColour(sgf.ParseGTP(move, 19), colour)
 			if err != nil {
 				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
-				Engines[colour].losses++
-				Engines[colour.Opposite()].wins++
+				engine.losses++
+				other_engine.wins++
 				final_error = err					// Set the error to return to caller.
 				break
 			}
 		}
 
-		// Must only get here with a valid move variable (including "pass")
+		// Relay the move. Must only get here with a valid move variable (including "pass")
 
-		other_engine := Engines[colour.Opposite()]
-		other_engine.SendAndReceive(fmt.Sprintf("play %s %s", colour.Lower(), move))
+		_, err = other_engine.SendAndReceive(fmt.Sprintf("play %s %s", colour.Lower(), move))
+
+		if err != nil {
+			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Upper()))
+			engine.wins++
+			other_engine.losses++
+			final_error = err
+			break
+		}
 	}
 
 	if final_error != nil {
