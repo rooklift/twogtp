@@ -1,6 +1,4 @@
-# twogtp
-
-Connect two Go (game) engines via GTP.
+Connect two Go (game) engines via GTP
 
 # Features
 
