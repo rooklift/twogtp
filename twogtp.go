@@ -162,7 +162,6 @@ func main() {
 	for {
 		err := play_game()
 		if err != nil {
-			fmt.Printf("%v\n", err)
 			clean_quit(1)
 		}
 		Engines[sgf.WHITE], Engines[sgf.BLACK] = Engines[sgf.BLACK], Engines[sgf.WHITE]
@@ -194,8 +193,8 @@ func play_game() error {
 	}
 
 	last_save_time := time.Now()
-	node := root
 	colour := sgf.WHITE
+	node := root
 
 	passes_in_a_row := 0
 
@@ -212,6 +211,8 @@ func play_game() error {
 		}
 
 		move, err := Engines[colour].SendAndReceive(fmt.Sprintf("genmove %s", colour.Lower()))
+
+		fmt.Printf(move + " ")
 
 		KillTime <- time.Now().Add(Config.Timeout)	// Delay the timeout death of this app.
 
@@ -241,7 +242,7 @@ func play_game() error {
 				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
 				Engines[colour].losses++
 				Engines[colour.Opposite()].wins++
-				final_error = err					// Set the error to return to caller. Overkill for an illegal move?
+				final_error = err					// Set the error to return to caller.
 				break
 			}
 		}
@@ -250,19 +251,18 @@ func play_game() error {
 
 		other_engine := Engines[colour.Opposite()]
 		other_engine.SendAndReceive(fmt.Sprintf("play %s %s", colour.Lower(), move))
+	}
 
-		node.Board().Dump()
+	if final_error != nil {
+		fmt.Printf("\n\n%v", final_error)
 	}
 
 	node.Save(outfilename)
 
-	fmt.Println()
+	fmt.Printf("\n\n")
 	fmt.Printf("%s: %d wins, %d losses\n", Engines[sgf.BLACK].name, Engines[sgf.BLACK].wins, Engines[sgf.BLACK].losses)
 	fmt.Printf("%s: %d wins, %d losses\n", Engines[sgf.WHITE].name, Engines[sgf.WHITE].wins, Engines[sgf.WHITE].losses)
-	fmt.Println()
-
-	KillTime <- time.Now().Add(Config.Timeout + 3 * time.Second)
-	time.Sleep(3 * time.Second)		// Just to see the score.
+	fmt.Printf("\n")
 
 	return final_error
 }
