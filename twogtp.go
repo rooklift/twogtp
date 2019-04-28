@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -14,8 +15,6 @@ import (
 
 	"github.com/fohristiwhirl/sgf"
 )
-
-const config_filename = "twogtp_config.json"
 
 type ConfigStruct struct {
 	Engine1Name			string		`json:"engine_1_name"`
@@ -29,9 +28,13 @@ type ConfigStruct struct {
 var Config ConfigStruct
 
 func init() {
-	file, err := ioutil.ReadFile(config_filename)
+	if len(os.Args) < 2 {
+		fmt.Printf("Usage: %s config_file\n", filepath.Base(os.Args[0]))
+		os.Exit(1)
+	}
+	file, err := ioutil.ReadFile(os.Args[1])
 	if err != nil {
-		panic("Couldn't load config file " + config_filename)
+		panic("Couldn't load config file " + os.Args[1])
 	}
 	err = json.Unmarshal(file, &Config)
 	if err != nil {
