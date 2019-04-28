@@ -25,12 +25,12 @@ type ConfigStruct struct {
 	Engine2Path			string				`json:"engine_2_path"`
 	Engine2Args			[]string			`json:"engine_2_args"`
 
-	TimeoutSeconds		time.Duration		`json:"timeout_seconds"`
+	Timeout				time.Duration		`json:"timeout_seconds"`		// Note: at load, is multiplied by time.Second so it's stored as a sane duration.
 }
 
 var Config ConfigStruct
 
-var DelayQuit = make(chan bool, 1024)		// Push back the timeout death of the app by sending to this.
+var KillTime = make(chan time.Time, 1024)	// Push back the timeout death of the app by sending to this.
 
 func init() {
 	if len(os.Args) < 2 {
@@ -46,7 +46,9 @@ func init() {
 		panic("Couldn't parse JSON: " + err.Error())
 	}
 
-	go killer()								// Kills the app if DelayQuit wasn't sent to recently (unless it was never sent to).
+	Config.Timeout *= time.Second
+
+	go killer()
 }
 
 type Engine struct {
@@ -194,7 +196,7 @@ func play_game(engines map[sgf.Colour]*Engine) error {
 
 		move, err := engines[colour].SendAndReceive(fmt.Sprintf("genmove %s", colour.Lower()))
 
-		DelayQuit <- true							// Delay the timeout death of this app.
+		KillTime <- time.Now().Add(Config.Timeout)	// Delay the timeout death of this app.
 
 		if err != nil {
 			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
@@ -241,25 +243,29 @@ func play_game(engines map[sgf.Colour]*Engine) error {
 	fmt.Printf("%s: %d wins, %d losses\n", engines[sgf.BLACK].name, engines[sgf.BLACK].wins, engines[sgf.BLACK].losses)
 	fmt.Printf("%s: %d wins, %d losses\n", engines[sgf.WHITE].name, engines[sgf.WHITE].wins, engines[sgf.WHITE].losses)
 	fmt.Println()
-	time.Sleep(3 * time.Second)		// Just to see it.
+
+	KillTime <- time.Now().Add(Config.Timeout + 3 * time.Second)
+	time.Sleep(3 * time.Second)		// Just to see the score.
 
 	return final_error
 }
 
 func killer() {
 
+	// Kill the app if we get past the most recent deadline sent to us.
+	// This is NOT the only way the app can quit.
+
 	var killtime time.Time
 	var fts_armed bool				// Have we ever received an update?
 
 	for {
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(642 * time.Millisecond)
 
 		ClearChannel:
 		for {
 			select {
-			case <- DelayQuit:
-				killtime = time.Now().Add(Config.TimeoutSeconds * time.Second)
+			case killtime = <- KillTime:
 				fts_armed = true
 			default:
 				break ClearChannel
