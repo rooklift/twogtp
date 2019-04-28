@@ -122,20 +122,29 @@ func (self *Engine) SendAndReceive(msg string) (string, error) {
 	msg = strings.TrimSpace(msg)
 	fmt.Fprintf(self.stdin, "%s\n", msg)
 
-	var response bytes.Buffer
+	var buf bytes.Buffer
+
 	for self.stdout.Scan() {
 
-		response.WriteString(self.stdout.Text())
-		response.WriteString("\n")
+		t := self.stdout.Text()
+		if len(t) > 0 && buf.Len() > 0 {	// We got a meaningful line, and already had some, so add a \n between them.
+			buf.WriteString("\n")
+		}
+		buf.WriteString(t)
 
-		if self.stdout.Text() == "" {
+		if len(t) == 0 {					// Last scan was an empty line, meaning the response has ended.
 
-			s := response.String()
+			s := strings.TrimSpace(buf.String())
 
-			if len(s) > 0 && s[0] == '?' {
+			if len(s) == 0 {				// Didn't even get an =
+				return "", fmt.Errorf("SendAndReceive(): got empty response")
+			}
+
+			if s[0] != '=' {
 				return "", fmt.Errorf("SendAndReceive(): got reply: %s", strings.TrimSpace(s))
 			}
 
+			// Seems we got a sane response.
 			// Return everything except the leading ID thing...
 
 			i := 0
