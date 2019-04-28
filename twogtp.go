@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -193,7 +192,7 @@ func play_game(engines map[sgf.Colour]*Engine) {
 			}
 		} else {
 			passes_in_a_row = 0
-			node, err = node.PlayMoveColour(move_to_sgf(move, 19), colour)
+			node, err = node.PlayMoveColour(sgf.ParseGTP(move, 19), colour)
 			if err != nil {
 				fmt.Printf("%v\n", err)
 				break
@@ -209,33 +208,4 @@ func play_game(engines map[sgf.Colour]*Engine) {
 	}
 
 	node.Save(outfilename)
-}
-
-func move_to_sgf(s string, size int) string {
-
-	if len(s) < 2 || len(s) > 3 {
-		return ""
-	}
-
-	if s[0] < 'A' || s[0] > 'Z' {
-		return ""
-	}
-
-	if s[1] < '0' || s[1] > '9' {
-		return ""
-	}
-
-	if len(s) == 3 && (s[2] < '0' || s[2] > '9') {
-		return ""
-	}
-
-	x := int(s[0]) - 65
-	if x >= 8 {
-		x--
-	}
-
-	y_int, _ := strconv.Atoi(s[1:])
-	y := size - int(y_int)
-
-	return sgf.Point(x, y)
 }
