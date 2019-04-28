@@ -43,14 +43,18 @@ func init() {
 }
 
 type Engine struct {
-	stdin	io.WriteCloser
-	stdout	*bufio.Scanner
-	stderr	*bufio.Scanner
+	stdin		io.WriteCloser
+	stdout		*bufio.Scanner
+	stderr		*bufio.Scanner
 
-	name	string			// For the SGF
-	dir		string
-	base	string
-	args	[]string		// Not including base
+	name		string			// For the SGF
+	dir			string
+	base		string
+	args		[]string		// Not including base
+
+	wins		int
+	losses		int
+	unknowns	int
 }
 
 func (self *Engine) Start(name, path string, args []string) {
@@ -93,9 +97,7 @@ func (self *Engine) ConsumeStderr() {
 	}
 }
 
-func (self *Engine) SendAndReceive(msg string) string {
-
-	// FIXME: detect dead engine
+func (self *Engine) SendAndReceive(msg string) (string, error) {
 
 	msg = strings.TrimSpace(msg)
 	fmt.Fprintf(self.stdin, "%s\n", msg)
@@ -119,14 +121,13 @@ func (self *Engine) SendAndReceive(msg string) string {
 				}
 			}
 
-			return strings.TrimSpace(s[i:])
+			return strings.TrimSpace(s[i:]), nil
 		}
 	}
 
 	// If we get to here, Scan() returned false, likely meaning the engine is dead.
-	// We should do something.
 
-	return ""
+	return "", fmt.Errorf("SendAndReceive(): %s crashed", self.name)
 }
 
 func main() {
@@ -139,12 +140,16 @@ func main() {
 	engines := map[sgf.Colour]*Engine{sgf.BLACK: a, sgf.WHITE: b}
 
 	for {
-		play_game(engines)
+		err := play_game(engines)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			return
+		}
 		engines[sgf.WHITE], engines[sgf.BLACK] = engines[sgf.BLACK], engines[sgf.WHITE]
 	}
 }
 
-func play_game(engines map[sgf.Colour]*Engine) {
+func play_game(engines map[sgf.Colour]*Engine) error {
 
 	root := sgf.NewTree(19)
 	root.SetValue("KM", "7.5")
@@ -172,6 +177,8 @@ func play_game(engines map[sgf.Colour]*Engine) {
 
 	outfilename := time.Now().Format("2006-01-02-15-04-05") + ".sgf"
 
+	var final_error error
+
 	for {
 		colour = colour.Opposite()
 
@@ -180,29 +187,40 @@ func play_game(engines map[sgf.Colour]*Engine) {
 			last_save_time = time.Now()
 		}
 
-		move := engines[colour].SendAndReceive(fmt.Sprintf("genmove %s", colour.Lower()))
+		move, err := engines[colour].SendAndReceive(fmt.Sprintf("genmove %s", colour.Lower()))
 
-		var err error
-
-		if move == "resign" {
+		if err != nil {
+			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
+			engines[colour].losses++
+			engines[colour.Opposite()].wins++
+			final_error = err						// Set the error to return to caller.
+			break
+		} else if move == "resign" {
 			root.SetValue("RE", fmt.Sprintf("%s+R", colour.Opposite().Upper()))
+			engines[colour].losses++
+			engines[colour.Opposite()].wins++
 			break
 		} else if move == "pass" {
 			passes_in_a_row++
 			node = node.PassColour(colour)
 			if passes_in_a_row >= 3 {
+				engines[colour].unknowns++
+				engines[colour.Opposite()].unknowns++
 				break
 			}
 		} else {
 			passes_in_a_row = 0
 			node, err = node.PlayMoveColour(sgf.ParseGTP(move, 19), colour)
 			if err != nil {
-				fmt.Printf("%v\n", err)
+				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
+				engines[colour].losses++
+				engines[colour.Opposite()].wins++
+				final_error = err						// Set the error to return to caller. Overkill for an illegal move?
 				break
 			}
 		}
 
-		// Must only get here with a valid move...
+		// Must only get here with a valid move variable (including "pass")
 
 		other_engine := engines[colour.Opposite()]
 		other_engine.SendAndReceive(fmt.Sprintf("play %s %s", colour.Lower(), move))
@@ -211,4 +229,12 @@ func play_game(engines map[sgf.Colour]*Engine) {
 	}
 
 	node.Save(outfilename)
+
+	fmt.Println()
+	fmt.Printf("%s: %d wins, %d losses\n", engines[sgf.BLACK].name, engines[sgf.BLACK].wins, engines[sgf.BLACK].losses)
+	fmt.Printf("%s: %d wins, %d losses\n", engines[sgf.WHITE].name, engines[sgf.WHITE].wins, engines[sgf.WHITE].losses)
+	fmt.Println()
+	time.Sleep(3 * time.Second)		// Just to see it.
+
+	return final_error
 }
