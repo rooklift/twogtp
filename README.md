@@ -4,7 +4,9 @@ Connect two Go (game) engines via GTP
 
 * Alternating colours
 * Crash detection
-* Timeout setting
+* Legality checks
+* Timeouts
+* Automatic SGF saving
 
 # Todo
 
