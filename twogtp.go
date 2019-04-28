@@ -58,9 +58,9 @@ type Engine struct {
 	stdout		*bufio.Scanner
 	stderr		*bufio.Scanner
 
-	name		string			// For the SGF
-	dir			string
-	base		string
+	name		string			// For the SGF "PB" or "PW" properties
+	dir			string			// Working directory
+	base		string			// Command name, e.g. "leelaz.exe"
 
 	args		[]string		// Not including base
 	commands	[]string		// GTP commands to be sent at start, e.g. time limit
