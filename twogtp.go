@@ -17,15 +17,20 @@ import (
 )
 
 type ConfigStruct struct {
-	Engine1Name			string		`json:"engine_1_name"`
-	Engine1Path			string		`json:"engine_1_path"`
-	Engine1Args			[]string	`json:"engine_1_args"`
-	Engine2Name			string		`json:"engine_2_name"`
-	Engine2Path			string		`json:"engine_2_path"`
-	Engine2Args			[]string	`json:"engine_2_args"`
+	Engine1Name			string				`json:"engine_1_name"`
+	Engine1Path			string				`json:"engine_1_path"`
+	Engine1Args			[]string			`json:"engine_1_args"`
+
+	Engine2Name			string				`json:"engine_2_name"`
+	Engine2Path			string				`json:"engine_2_path"`
+	Engine2Args			[]string			`json:"engine_2_args"`
+
+	TimeoutSeconds		time.Duration		`json:"timeout_seconds"`
 }
 
 var Config ConfigStruct
+
+var DelayQuit = make(chan bool, 1024)		// Push back the timeout death of the app by sending to this.
 
 func init() {
 	if len(os.Args) < 2 {
@@ -40,6 +45,8 @@ func init() {
 	if err != nil {
 		panic("Couldn't parse JSON: " + err.Error())
 	}
+
+	go killer()								// Kills the app if DelayQuit wasn't sent to recently (unless it was never sent to).
 }
 
 type Engine struct {
@@ -187,6 +194,8 @@ func play_game(engines map[sgf.Colour]*Engine) error {
 
 		move, err := engines[colour].SendAndReceive(fmt.Sprintf("genmove %s", colour.Lower()))
 
+		DelayQuit <- true							// Delay the timeout death of this app.
+
 		if err != nil {
 			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
 			engines[colour].losses++
@@ -213,7 +222,7 @@ func play_game(engines map[sgf.Colour]*Engine) error {
 				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
 				engines[colour].losses++
 				engines[colour.Opposite()].wins++
-				final_error = err						// Set the error to return to caller. Overkill for an illegal move?
+				final_error = err					// Set the error to return to caller. Overkill for an illegal move?
 				break
 			}
 		}
@@ -235,4 +244,35 @@ func play_game(engines map[sgf.Colour]*Engine) error {
 	time.Sleep(3 * time.Second)		// Just to see it.
 
 	return final_error
+}
+
+func killer() {
+
+	var killtime time.Time
+	var fts_armed bool				// Have we ever received an update?
+
+	for {
+
+		time.Sleep(1 * time.Second)
+
+		ClearChannel:
+		for {
+			select {
+			case <- DelayQuit:
+				killtime = time.Now().Add(Config.TimeoutSeconds * time.Second)
+				fts_armed = true
+			default:
+				break ClearChannel
+			}
+		}
+
+		if fts_armed == false {
+			continue
+		}
+
+		if time.Now().After(killtime) {
+			fmt.Printf("killer(): timeout\n")
+			os.Exit(1)
+		}
+	}
 }
