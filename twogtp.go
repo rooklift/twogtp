@@ -115,10 +115,8 @@ func (self *Engine) SendAndReceive(msg string) (string, error) {
 			s := response.String()
 			i := 0
 
-			if len(s) > 0 {
-				for s[i] == '=' || s[i] >= '0' && s[i] <= '9' {
-					i++
-				}
+			for i < len(s) && (s[i] == '=' || s[i] >= '0' && s[i] <= '9') {
+				i++
 			}
 
 			return strings.TrimSpace(s[i:]), nil
