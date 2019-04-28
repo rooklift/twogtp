@@ -27,12 +27,14 @@ type ConfigStruct struct {
 	Engine2Args			[]string			`json:"engine_2_args"`
 	Engine2Commands		[]string			`json:"engine_2_commands"`
 
-	Timeout				time.Duration		`json:"timeout_seconds"`		// Note: at load, is multiplied by time.Second so it's stored as a sane duration.
+	Timeout				time.Duration		`json:"timeout_seconds"`		// Note: at load, is multiplied by time.Second
 }
 
-var Config ConfigStruct
+// Some use of globals, because reasons...
 
+var Config ConfigStruct
 var KillTime = make(chan time.Time, 1024)	// Push back the timeout death of the app by sending to this.
+var Engines map[sgf.Colour]*Engine
 
 func init() {
 	if len(os.Args) < 2 {
@@ -68,6 +70,8 @@ type Engine struct {
 	wins		int
 	losses		int
 	unknowns	int
+
+	process		*os.Process
 }
 
 func (self *Engine) Start(name, path string, args []string, commands []string) {
@@ -101,6 +105,8 @@ func (self *Engine) Start(name, path string, args []string, commands []string) {
 	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
 		panic(fmt.Sprintf("\nerr1: %v\nerr2: %v\nerr3: %v\nerr4: %v\n", err1, err2, err3, err4))
 	}
+
+	self.process = cmd.Process
 
 	go self.ConsumeStderr()
 }
@@ -151,33 +157,33 @@ func main() {
 	a.Start(Config.Engine1Name, Config.Engine1Path, Config.Engine1Args, Config.Engine1Commands)
 	b.Start(Config.Engine2Name, Config.Engine2Path, Config.Engine2Args, Config.Engine2Commands)
 
-	engines := map[sgf.Colour]*Engine{sgf.BLACK: a, sgf.WHITE: b}
+	Engines = map[sgf.Colour]*Engine{sgf.BLACK: a, sgf.WHITE: b}
 
 	for {
-		err := play_game(engines)
+		err := play_game()
 		if err != nil {
 			fmt.Printf("%v\n", err)
-			return
+			clean_quit(1)
 		}
-		engines[sgf.WHITE], engines[sgf.BLACK] = engines[sgf.BLACK], engines[sgf.WHITE]
+		Engines[sgf.WHITE], Engines[sgf.BLACK] = Engines[sgf.BLACK], Engines[sgf.WHITE]
 	}
 }
 
-func play_game(engines map[sgf.Colour]*Engine) error {
+func play_game() error {
 
 	root := sgf.NewTree(19)
 	root.SetValue("KM", "7.5")
 
 	root.SetValue("C", fmt.Sprintf("Black:  %s\n%v\n\nWhite:  %s\n%v",
-		engines[sgf.BLACK].base,
-		engines[sgf.BLACK].args,
-		engines[sgf.WHITE].base,
-		engines[sgf.WHITE].args))
+		Engines[sgf.BLACK].base,
+		Engines[sgf.BLACK].args,
+		Engines[sgf.WHITE].base,
+		Engines[sgf.WHITE].args))
 
-	root.SetValue("PB", engines[sgf.BLACK].name)
-	root.SetValue("PW", engines[sgf.WHITE].name)
+	root.SetValue("PB", Engines[sgf.BLACK].name)
+	root.SetValue("PW", Engines[sgf.WHITE].name)
 
-	for _, engine := range engines {
+	for _, engine := range Engines {
 		engine.SendAndReceive("boardsize 19")
 		engine.SendAndReceive("komi 7.5")
 		engine.SendAndReceive("clear_board")
@@ -205,27 +211,27 @@ func play_game(engines map[sgf.Colour]*Engine) error {
 			last_save_time = time.Now()
 		}
 
-		move, err := engines[colour].SendAndReceive(fmt.Sprintf("genmove %s", colour.Lower()))
+		move, err := Engines[colour].SendAndReceive(fmt.Sprintf("genmove %s", colour.Lower()))
 
 		KillTime <- time.Now().Add(Config.Timeout)	// Delay the timeout death of this app.
 
 		if err != nil {
 			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
-			engines[colour].losses++
-			engines[colour.Opposite()].wins++
+			Engines[colour].losses++
+			Engines[colour.Opposite()].wins++
 			final_error = err						// Set the error to return to caller.
 			break
 		} else if move == "resign" {
 			root.SetValue("RE", fmt.Sprintf("%s+R", colour.Opposite().Upper()))
-			engines[colour].losses++
-			engines[colour.Opposite()].wins++
+			Engines[colour].losses++
+			Engines[colour.Opposite()].wins++
 			break
 		} else if move == "pass" {
 			passes_in_a_row++
 			node = node.PassColour(colour)
 			if passes_in_a_row >= 3 {
-				engines[colour].unknowns++
-				engines[colour.Opposite()].unknowns++
+				Engines[colour].unknowns++
+				Engines[colour.Opposite()].unknowns++
 				break
 			}
 		} else {
@@ -233,8 +239,8 @@ func play_game(engines map[sgf.Colour]*Engine) error {
 			node, err = node.PlayMoveColour(sgf.ParseGTP(move, 19), colour)
 			if err != nil {
 				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
-				engines[colour].losses++
-				engines[colour.Opposite()].wins++
+				Engines[colour].losses++
+				Engines[colour.Opposite()].wins++
 				final_error = err					// Set the error to return to caller. Overkill for an illegal move?
 				break
 			}
@@ -242,7 +248,7 @@ func play_game(engines map[sgf.Colour]*Engine) error {
 
 		// Must only get here with a valid move variable (including "pass")
 
-		other_engine := engines[colour.Opposite()]
+		other_engine := Engines[colour.Opposite()]
 		other_engine.SendAndReceive(fmt.Sprintf("play %s %s", colour.Lower(), move))
 
 		node.Board().Dump()
@@ -251,8 +257,8 @@ func play_game(engines map[sgf.Colour]*Engine) error {
 	node.Save(outfilename)
 
 	fmt.Println()
-	fmt.Printf("%s: %d wins, %d losses\n", engines[sgf.BLACK].name, engines[sgf.BLACK].wins, engines[sgf.BLACK].losses)
-	fmt.Printf("%s: %d wins, %d losses\n", engines[sgf.WHITE].name, engines[sgf.WHITE].wins, engines[sgf.WHITE].losses)
+	fmt.Printf("%s: %d wins, %d losses\n", Engines[sgf.BLACK].name, Engines[sgf.BLACK].wins, Engines[sgf.BLACK].losses)
+	fmt.Printf("%s: %d wins, %d losses\n", Engines[sgf.WHITE].name, Engines[sgf.WHITE].wins, Engines[sgf.WHITE].losses)
 	fmt.Println()
 
 	KillTime <- time.Now().Add(Config.Timeout + 3 * time.Second)
@@ -289,7 +295,16 @@ func killer() {
 
 		if time.Now().After(killtime) {
 			fmt.Printf("killer(): timeout\n")
-			os.Exit(1)
+			clean_quit(1)
 		}
 	}
+}
+
+func clean_quit(n int) {
+	for _, engine := range Engines {
+		fmt.Printf("Killing %s... ", engine.name)
+		err := engine.process.Kill()
+		fmt.Printf("%v\n", err)
+	}
+	os.Exit(n)
 }
