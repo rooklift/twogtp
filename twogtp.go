@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,9 +66,10 @@ type Engine struct {
 	args		[]string		// Not including base
 	commands	[]string		// GTP commands to be sent at start, e.g. time limit
 
-	wins		int
-	losses		int
-	unknowns	int
+	wins_b		int
+	losses_b	int
+	wins_w		int
+	losses_w	int
 
 	process		*os.Process
 }
@@ -114,6 +116,64 @@ func (self *Engine) Start(name, path string, args []string, commands []string) {
 func (self *Engine) ConsumeStderr() {
 	for self.stderr.Scan() {
 		// fmt.Printf("%s\n", self.stderr.Text())
+	}
+}
+
+func (self *Engine) ScoreElements() []string {
+
+	// name, wins, win%, black_wins, black_win%, white_wins, white_win%
+
+	var ret []string
+
+	wins    := self.wins_b   + self.wins_w
+	losses  := self.losses_b + self.losses_w
+	games   := wins          + losses					// FIXME if we ever have unknowns.
+	games_b := self.wins_b   + self.losses_b
+	games_w := self.wins_w   + self.losses_w
+
+	ret = append(ret, self.name)
+
+	ret = append(ret, strconv.Itoa(wins))
+	if games > 0 {
+		ret = append(ret, fmt.Sprintf("%.0f%%", 100.0 * float64(wins) / float64(games)))
+	} else {
+		ret = append(ret, "0%")
+	}
+
+	ret = append(ret, strconv.Itoa(self.wins_b))
+	if games_b > 0 {
+		ret = append(ret, fmt.Sprintf("%.0f%%", 100.0 * float64(self.wins_b) / float64(games_b)))
+	} else {
+		ret = append(ret, "0%")
+	}
+
+	ret = append(ret, strconv.Itoa(self.wins_w))
+	if games_w > 0 {
+		ret = append(ret, fmt.Sprintf("%.0f%%", 100.0 * float64(self.wins_w) / float64(games_w)))
+	} else {
+		ret = append(ret, "0%")
+	}
+
+	return ret
+}
+
+func (self *Engine) Win(colour sgf.Colour) {
+	if colour == sgf.BLACK {
+		self.wins_b++
+	} else if colour == sgf.WHITE {
+		self.wins_w++
+	} else {
+		panic("bad colour")
+	}
+}
+
+func (self *Engine) Lose(colour sgf.Colour) {
+	if colour == sgf.BLACK {
+		self.losses_b++
+	} else if colour == sgf.WHITE {
+		self.losses_w++
+	} else {
+		panic("bad colour")
 	}
 }
 
@@ -244,21 +304,20 @@ func play_game(engines []*Engine, swap bool) error {
 
 		if err != nil {
 			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
-			engine.losses++
-			opponent.wins++
+			engine.Lose(colour)
+			opponent.Win(colour.Opposite())
 			final_error = err						// Set the error to return to caller.
 			break
 		} else if move == "resign" {
 			root.SetValue("RE", fmt.Sprintf("%s+R", colour.Opposite().Upper()))
-			engine.losses++
-			opponent.wins++
+			engine.Lose(colour)
+			opponent.Win(colour.Opposite())
 			break
 		} else if move == "pass" {
 			passes_in_a_row++
 			node = node.PassColour(colour)
 			if passes_in_a_row >= 3 {
-				engine.unknowns++
-				opponent.unknowns++
+				// FIXME: get the result somehow...
 				break
 			}
 		} else {
@@ -266,8 +325,8 @@ func play_game(engines []*Engine, swap bool) error {
 			node, err = node.PlayMoveColour(sgf.ParseGTP(move, 19), colour)
 			if err != nil {
 				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
-				engine.losses++
-				opponent.wins++
+				engine.Lose(colour)
+				opponent.Win(colour.Opposite())
 				final_error = err					// Set the error to return to caller.
 				break
 			}
@@ -279,8 +338,8 @@ func play_game(engines []*Engine, swap bool) error {
 
 		if err != nil {
 			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Upper()))
-			engine.wins++
-			opponent.losses++
+			engine.Win(colour)
+			opponent.Lose(colour.Opposite())
 			final_error = err
 			break
 		}
@@ -345,15 +404,13 @@ func clean_quit(n int, engines []*Engine) {
 
 func print_scores(engines []*Engine) {
 
+	format := " %-20.20s   %4v %-7v %4v %-7v %4v %-7v\n"
+
 	fmt.Printf("\n\n")
-	fmt.Printf("%s: %d wins, %d losses", engines[0].name, engines[0].wins, engines[0].losses)
-	if engines[0].unknowns > 0 {
-		fmt.Printf(", %d unknown", engines[0].unknowns)
+	fmt.Printf(format, "", "", "wins", "", "black", "", "white")
+	for _, engine := range engines {
+		elements := engine.ScoreElements()
+		fmt.Printf(format, elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6])
 	}
 	fmt.Printf("\n")
-	fmt.Printf("%s: %d wins, %d losses", engines[1].name, engines[1].wins, engines[1].losses)
-	if engines[1].unknowns > 0 {
-		fmt.Printf(", %d unknown", engines[1].unknowns)
-	}
-	fmt.Printf("\n\n")
 }
