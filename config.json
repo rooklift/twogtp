@@ -11,13 +11,13 @@
 		"time_settings 0 11 1"
 	],
 
-	"engine_2_name": "Elf (via LZ)",
+	"engine_2_name": "Elfv2 (via LZ)",
 	"engine_2_path": "../../../../../Programs (self-installed)/Leela Zero/leelaz.exe",
 	"engine_2_args": [
 		"--gtp",
 		"--noponder",
 		"-w",
-		"networks/elf_converted_05dbca15"
+		"networks/elf_v2_05dbca15"
 	],
 	"engine_2_commands": [
 		"time_settings 0 11 1"
