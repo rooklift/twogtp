@@ -8,6 +8,8 @@ Connect two Go (game) engines via [Go Text Protocol](https://www.lysator.liu.se/
 * Timeouts
 * Automatic SGF saving
 
-# Todo
+# Notes
 
-* Score games that end by passing
+* Control whether the engines are restarted between games with the "restart" option.
+* The "passing_wins" option is a cheap hack to allow Leela test matches to end early; the first engine to pass is considered the winner (this is usually correct).
+* Otherwise, we currently do not try to calculate the score if the game ends due to 2 passes.
