@@ -29,6 +29,7 @@ type ConfigStruct struct {
 	Engine2Commands		[]string			`json:"engine_2_commands"`
 
 	Timeout				time.Duration		`json:"timeout_seconds"`		// Note: at load, is multiplied by time.Second
+	PassingWins			bool				`json:"passing_wins"`			// Surprisingly good heuristic for LZ at least
 }
 
 var Config ConfigStruct
@@ -316,7 +317,14 @@ func play_game(engines []*Engine, swap bool) error {
 		} else if move == "pass" {
 			passes_in_a_row++
 			node = node.PassColour(colour)
-			if passes_in_a_row >= 3 {
+			if Config.PassingWins {
+				root.SetValue("RE", fmt.Sprintf("%s+", colour.Upper()))
+				node.SetValue("C", fmt.Sprintf("%s declared victory.", engine.base))
+				engine.Win(colour)
+				opponent.Lose(colour.Opposite())
+				break
+			}
+			if passes_in_a_row >= 2 {
 				// FIXME: get the result somehow...
 				break
 			}
