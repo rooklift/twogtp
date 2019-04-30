@@ -4,10 +4,10 @@
 	"engine_1_args": [
 		"--gtp",
 		"--noponder",
-		"-v",
-		"1601",
-		"-w",
-		"networks/f3be3bf826efebef668546146af97c64bdf1c0dac6841dc70bfe777a6195b02d"
+		"--visits", "10",
+		"--threads", "1",
+		"--timemanage", "off",
+		"--weights", "networks/f3be3bf826efebef668546146af97c64bdf1c0dac6841dc70bfe777a6195b02d"
 	],
 	"engine_1_commands": [],
 
@@ -16,10 +16,10 @@
 	"engine_2_args": [
 		"--gtp",
 		"--noponder",
-		"-v",
-		"1601",
-		"-w",
-		"networks/elf_v2_05dbca15"
+		"--visits", "10",
+		"--threads", "1",
+		"--timemanage", "off",
+		"--weights", "networks/elf_v2_05dbca15"
 	],
 	"engine_2_commands": [],
 
