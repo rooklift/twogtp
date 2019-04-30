@@ -30,6 +30,7 @@ type ConfigStruct struct {
 
 	Timeout				time.Duration		`json:"timeout_seconds"`		// Note: at load, is multiplied by time.Second
 	PassingWins			bool				`json:"passing_wins"`			// Surprisingly good heuristic for LZ at least
+	Restart				bool				`json:"restart"`
 }
 
 var Config ConfigStruct
@@ -58,7 +59,6 @@ func init() {
 type Engine struct {
 	stdin		io.WriteCloser
 	stdout		*bufio.Scanner
-	stderr		*bufio.Scanner
 
 	name		string			// For the SGF "PB" or "PW" properties
 	dir			string			// Working directory
@@ -80,10 +80,22 @@ func (self *Engine) Start(name, path string, args []string, commands []string) {
 	self.name = name
 	self.dir = filepath.Dir(path)
 	self.base = filepath.Base(path)
-	self.commands = commands
 
-	for _, a := range args {
-		self.args = append(self.args, a)
+	self.args = make([]string, len(args))
+	copy(self.args, args)
+
+	self.commands = make([]string, len(commands))
+	copy(self.commands, commands)
+
+	self.Restart()
+
+	RegisterEngine <- self			// Let the killer goroutine know we exist
+}
+
+func (self *Engine) Restart() {
+
+	if self.process != nil {
+		self.process.Kill()
 	}
 
 	var cmd exec.Cmd
@@ -99,7 +111,7 @@ func (self *Engine) Start(name, path string, args []string, commands []string) {
 	self.stdout = bufio.NewScanner(stdout_pipe)
 
 	stderr_pipe, err3 := cmd.StderrPipe()
-	self.stderr = bufio.NewScanner(stderr_pipe)
+	stderr := bufio.NewScanner(stderr_pipe)
 
 	err4 := cmd.Start()
 
@@ -109,13 +121,11 @@ func (self *Engine) Start(name, path string, args []string, commands []string) {
 
 	self.process = cmd.Process
 
-	RegisterEngine <- self			// Let the killer goroutine know we exist
-
-	go self.ConsumeStderr()
+	go consume_scanner(stderr)
 }
 
-func (self *Engine) ConsumeStderr() {
-	for self.stderr.Scan() {
+func consume_scanner(scanner *bufio.Scanner) {
+	for scanner.Scan() {								// Will end when the pipe closes due to an engine restart.
 		// fmt.Printf("%s\n", self.stderr.Text())
 	}
 }
@@ -241,6 +251,11 @@ func main() {
 		if err != nil {
 			clean_quit(1, engines)
 		}
+		if Config.Restart {
+			fmt.Printf("Restarting engines...\n")
+			engines[0].Restart()
+			engines[1].Restart()
+		}
 		swap = !swap
 	}
 }
@@ -269,6 +284,7 @@ func play_game(engines []*Engine, swap bool) error {
 		engine.SendAndReceive("boardsize 19")
 		engine.SendAndReceive("komi 7.5")
 		engine.SendAndReceive("clear_board")
+		engine.SendAndReceive("clear_cache")		// Always wanted where available
 
 		for _, command := range engine.commands {
 			engine.SendAndReceive(command)

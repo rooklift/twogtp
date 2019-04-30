@@ -24,5 +24,6 @@
 	"engine_2_commands": [],
 
 	"timeout_seconds": 120,
-	"passing_wins": true
+	"passing_wins": true,
+	"restart": false
 }
