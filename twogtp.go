@@ -57,35 +57,35 @@ func init() {
 }
 
 type Engine struct {
-	stdin		io.WriteCloser
-	stdout		*bufio.Scanner
+	Stdin		io.WriteCloser
+	Stdout		*bufio.Scanner
 
-	name		string			// For the SGF "PB" or "PW" properties
-	dir			string			// Working directory
-	base		string			// Command name, e.g. "leelaz.exe"
+	Name		string			// For the SGF "PB" or "PW" properties
+	Dir			string			// Working directory
+	Base		string			// Command name, e.g. "leelaz.exe"
 
-	args		[]string		// Not including base
-	commands	[]string		// GTP commands to be sent at start, e.g. time limit
+	Args		[]string		// Not including base
+	Commands	[]string		// GTP commands to be sent at start, e.g. time limit
+
+	Process		*os.Process
 
 	wins_b		int
 	losses_b	int
 	wins_w		int
 	losses_w	int
-
-	process		*os.Process
 }
 
 func (self *Engine) Start(name, path string, args []string, commands []string) {
 
-	self.name = name
-	self.dir = filepath.Dir(path)
-	self.base = filepath.Base(path)
+	self.Name = name
+	self.Dir = filepath.Dir(path)
+	self.Base = filepath.Base(path)
 
-	self.args = make([]string, len(args))
-	copy(self.args, args)
+	self.Args = make([]string, len(args))
+	copy(self.Args, args)
 
-	self.commands = make([]string, len(commands))
-	copy(self.commands, commands)
+	self.Commands = make([]string, len(commands))
+	copy(self.Commands, commands)
 
 	self.Restart()
 
@@ -94,21 +94,21 @@ func (self *Engine) Start(name, path string, args []string, commands []string) {
 
 func (self *Engine) Restart() {
 
-	if self.process != nil {
-		self.process.Kill()
+	if self.Process != nil {
+		self.Process.Kill()
 	}
 
 	var cmd exec.Cmd
 
-	cmd.Dir = self.dir
-	cmd.Path = self.base
-	cmd.Args = append([]string{self.base}, self.args...)
+	cmd.Dir = self.Dir
+	cmd.Path = self.Base
+	cmd.Args = append([]string{self.Base}, self.Args...)
 
 	var err1 error
-	self.stdin, err1 = cmd.StdinPipe()
+	self.Stdin, err1 = cmd.StdinPipe()
 
 	stdout_pipe, err2 := cmd.StdoutPipe()
-	self.stdout = bufio.NewScanner(stdout_pipe)
+	self.Stdout = bufio.NewScanner(stdout_pipe)
 
 	stderr_pipe, err3 := cmd.StderrPipe()
 	stderr := bufio.NewScanner(stderr_pipe)
@@ -119,7 +119,7 @@ func (self *Engine) Restart() {
 		panic(fmt.Sprintf("\nerr1: %v\nerr2: %v\nerr3: %v\nerr4: %v\n", err1, err2, err3, err4))
 	}
 
-	self.process = cmd.Process
+	self.Process = cmd.Process
 
 	go consume_scanner(stderr)
 }
@@ -142,7 +142,7 @@ func (self *Engine) ScoreElements() []string {
 	games_b := self.wins_b   + self.losses_b
 	games_w := self.wins_w   + self.losses_w
 
-	ret = append(ret, self.name)
+	ret = append(ret, self.Name)
 
 	ret = append(ret, strconv.Itoa(wins))
 	if games > 0 {
@@ -191,13 +191,13 @@ func (self *Engine) Lose(colour sgf.Colour) {
 func (self *Engine) SendAndReceive(msg string) (string, error) {
 
 	msg = strings.TrimSpace(msg)
-	fmt.Fprintf(self.stdin, "%s\n", msg)
+	fmt.Fprintf(self.Stdin, "%s\n", msg)
 
 	var buf bytes.Buffer
 
-	for self.stdout.Scan() {
+	for self.Stdout.Scan() {
 
-		t := self.stdout.Text()
+		t := self.Stdout.Text()
 		if len(t) > 0 && buf.Len() > 0 {	// We got a meaningful line, and already had some, so add a \n between them.
 			buf.WriteString("\n")
 		}
@@ -230,7 +230,7 @@ func (self *Engine) SendAndReceive(msg string) (string, error) {
 
 	// If we get to here, Scan() returned false, likely meaning the engine is dead.
 
-	return "", fmt.Errorf("SendAndReceive(): %s crashed", self.name)
+	return "", fmt.Errorf("SendAndReceive(): %s crashed", self.Name)
 }
 
 func main() {
@@ -272,13 +272,13 @@ func play_game(engines []*Engine, swap bool) error {
 	root.SetValue("KM", "7.5")
 
 	root.SetValue("C", fmt.Sprintf("Black:  %s\n%v\n\nWhite:  %s\n%v",
-		black.base,
-		black.args,
-		white.base,
-		white.args))
+		black.Base,
+		black.Args,
+		white.Base,
+		white.Args))
 
-	root.SetValue("PB", black.name)
-	root.SetValue("PW", white.name)
+	root.SetValue("PB", black.Name)
+	root.SetValue("PW", white.Name)
 
 	for _, engine := range engines {
 		engine.SendAndReceive("boardsize 19")
@@ -286,7 +286,7 @@ func play_game(engines []*Engine, swap bool) error {
 		engine.SendAndReceive("clear_board")
 		engine.SendAndReceive("clear_cache")		// Always wanted where available
 
-		for _, command := range engine.commands {
+		for _, command := range engine.Commands {
 			engine.SendAndReceive(command)
 		}
 	}
@@ -335,7 +335,7 @@ func play_game(engines []*Engine, swap bool) error {
 			node = node.PassColour(colour)
 			if Config.PassingWins {
 				root.SetValue("RE", fmt.Sprintf("%s+", colour.Upper()))
-				node.SetValue("C", fmt.Sprintf("%s declared victory.", engine.base))
+				node.SetValue("C", fmt.Sprintf("%s declared victory.", engine.Base))
 				engine.Win(colour)
 				opponent.Lose(colour.Opposite())
 				break
@@ -416,8 +416,8 @@ func killer() {
 
 func clean_quit(n int, engines []*Engine) {
 	for _, engine := range engines {
-		fmt.Printf("Killing %s...", engine.name)
-		err := engine.process.Kill()
+		fmt.Printf("Killing %s...", engine.Name)
+		err := engine.Process.Kill()
 		if err != nil {
 			fmt.Printf(" %v", err)
 		}
