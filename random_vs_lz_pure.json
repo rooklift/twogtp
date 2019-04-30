@@ -1,0 +1,26 @@
+{
+	"engine_1_name": "Random",
+	"engine_1_path": "C:\\Users\\Owner\\github\\gtp\\examples\\random.exe",
+	"engine_1_args": [],
+	"engine_1_commands": [],
+
+	"engine_2_name": "LZ Pure",
+	"engine_2_path": "C:\\Programs (self-installed)\\Leela Zero\\leelaz.exe",
+	"engine_2_args": [
+		"--gtp",
+		"--noponder",
+		"--visits",
+		"1",
+		"--threads",
+		"1",
+		"--timemanage",
+		"off",
+		"--weights", "networks/final_pure_LZ_ecab83bb"
+	],
+	"engine_2_commands": [],
+
+	"timeout_seconds": 120,
+	"passing_wins": true,
+	"restart": true,
+	"games": 6
+}

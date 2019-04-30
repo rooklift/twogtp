@@ -5,7 +5,7 @@
 		"--gtp",
 		"--noponder",
 		"--visits",
-		"10",
+		"17",
 		"--threads",
 		"1",
 		"--timemanage",
@@ -15,12 +15,12 @@
 	"engine_1_commands": [],
 
 	"engine_2_name": "Elfv2 (via LZ)",
-	"engine_2_path": "../../../../../Programs (self-installed)/Leela Zero/leelaz.exe",
+	"engine_2_path": "C:\\Programs (self-installed)\\Leela Zero\\leelaz.exe",
 	"engine_2_args": [
 		"--gtp",
 		"--noponder",
 		"--visits",
-		"10",
+		"17",
 		"--threads",
 		"1",
 		"--timemanage",
