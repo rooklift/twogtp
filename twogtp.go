@@ -307,7 +307,7 @@ func play_game(engines []*Engine, swap bool) error {
 			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
 			engine.Lose(colour)
 			opponent.Win(colour.Opposite())
-			final_error = err						// Set the error to return to caller.
+			final_error = err						// Set the error to return to caller. This kills the app.
 			break
 		} else if move == "resign" {
 			root.SetValue("RE", fmt.Sprintf("%s+R", colour.Opposite().Upper()))
@@ -335,7 +335,7 @@ func play_game(engines []*Engine, swap bool) error {
 				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
 				engine.Lose(colour)
 				opponent.Win(colour.Opposite())
-				final_error = err					// Set the error to return to caller.
+				final_error = err					// Set the error to return to caller. This kills the app.
 				break
 			}
 		}
@@ -348,7 +348,7 @@ func play_game(engines []*Engine, swap bool) error {
 			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Upper()))
 			engine.Win(colour)
 			opponent.Lose(colour.Opposite())
-			final_error = err
+			final_error = err						// Set the error to return to caller. This kills the app.
 			break
 		}
 	}
