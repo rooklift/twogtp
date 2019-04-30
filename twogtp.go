@@ -247,6 +247,7 @@ func main() {
 	swap := false
 
 	dyers := make(map[string]string)				// dyer --> first filename
+	collisions := 0
 
 	for n := 0; n < Config.Games; n++ {
 
@@ -257,6 +258,7 @@ func main() {
 		first_filename, exists := dyers[new_dyer]
 		if exists {
 			fmt.Printf("\n\nGame was similar to %s", first_filename)
+			collisions++
 		} else {
 			dyers[new_dyer] = filename
 		}
@@ -274,6 +276,10 @@ func main() {
 
 		swap = !swap
 	}
+
+	fmt.Printf("%d Dyer collisions noted.\n\n", collisions)
+
+	clean_quit(0, engines)
 }
 
 func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
@@ -444,7 +450,7 @@ func clean_quit(n int, engines []*Engine) {
 
 func print_scores(engines []*Engine) {
 
-	format := " %-20.20s   %4v %-7v %4v %-7v %4v %-7v\n"
+	format := "%-20.20s   %4v %-7v %4v %-7v %4v %-7v\n"
 
 	fmt.Printf("\n\n")
 	fmt.Printf(format, "", "", "wins", "", "black", "", "white")
