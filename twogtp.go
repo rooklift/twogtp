@@ -31,6 +31,7 @@ type ConfigStruct struct {
 	Timeout				time.Duration		`json:"timeout_seconds"`		// Note: at load, is multiplied by time.Second
 	PassingWins			bool				`json:"passing_wins"`			// Surprisingly good heuristic for LZ at least
 	Restart				bool				`json:"restart"`
+	Games				int					`json:"games"`
 }
 
 var Config ConfigStruct
@@ -245,14 +246,13 @@ func main() {
 	engines := []*Engine{a, b}
 	swap := false
 
-	for {
+	for n := 0; n < Config.Games; n++ {
 		err := play_game(engines, swap)
 		print_scores(engines)
 		if err != nil {
 			clean_quit(1, engines)
 		}
 		if Config.Restart {
-			fmt.Printf("Restarting engines...\n")
 			engines[0].Restart()
 			engines[1].Restart()
 		}
