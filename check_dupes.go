@@ -26,7 +26,7 @@ func main() {
 			dyer := root.Dyer()
 
 			if already_seen_filename, ok := dyers[dyer]; ok {
-				fmt.Printf("Collision:  %s  %s\n", already_seen_filename, filename)
+				fmt.Printf("Collision:  %s  ==  %s\n", filename, already_seen_filename)
 			} else {
 				dyers[dyer] = filename
 			}
