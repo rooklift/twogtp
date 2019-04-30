@@ -2,7 +2,7 @@ Connect two Go (game) engines via [Go Text Protocol](https://www.lysator.liu.se/
 
 # Features
 
-* Multiple matches with alternating colours
+* Plays multiple games with alternating colours
 * Crash detection
 * Legality checks
 * Timeouts
