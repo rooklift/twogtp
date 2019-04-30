@@ -246,21 +246,37 @@ func main() {
 	engines := []*Engine{a, b}
 	swap := false
 
+	dyers := make(map[string]string)				// dyer --> first filename
+
 	for n := 0; n < Config.Games; n++ {
-		err := play_game(engines, swap)
+
+		root, filename, err := play_game(engines, swap)
+
+		new_dyer := root.Dyer()
+
+		first_filename, exists := dyers[new_dyer]
+		if exists {
+			fmt.Printf("\n\nGame was similar to %s", first_filename)
+		} else {
+			dyers[new_dyer] = filename
+		}
+
 		print_scores(engines)
+
 		if err != nil {
 			clean_quit(1, engines)
 		}
+
 		if Config.Restart {
 			engines[0].Restart()
 			engines[1].Restart()
 		}
+
 		swap = !swap
 	}
 }
 
-func play_game(engines []*Engine, swap bool) error {
+func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 
 	black := engines[0]
 	white := engines[1]
@@ -374,7 +390,7 @@ func play_game(engines []*Engine, swap bool) error {
 	}
 
 	node.Save(outfilename)
-	return final_error
+	return node.GetRoot(), outfilename, final_error
 }
 
 func killer() {
