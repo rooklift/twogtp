@@ -33,7 +33,7 @@ type ConfigStruct struct {
 	Restart				bool				`json:"restart"`
 	Games				int					`json:"games"`
 
-	Size				int
+	Size				int					`json:"size"`
 }
 
 var Config ConfigStruct
@@ -56,7 +56,12 @@ func init() {
 
 	Config.Timeout *= time.Second
 
-	Config.Size = 19;
+	if Config.Size < 1 {
+		Config.Size = 19
+	}
+	if Config.Size > 25 {
+		panic("Size not supported: " + strconv.Itoa(Config.Size))
+	}
 
 	go killer()
 }
@@ -321,7 +326,15 @@ func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 	passes_in_a_row := 0
 	node := root
 
-	outfilename := time.Now().Format("2006-01-02-15-04-05") + ".sgf"
+	outfilename := time.Now().Format("20060102-15-04-05") + ".sgf"
+	for appendix := byte('a'); appendix <= 'z'; appendix++ {
+		_, err := os.Stat(outfilename)
+		if err == nil {					// File exists...
+			outfilename = time.Now().Format("20060102-15-04-05") + string([]byte{appendix}) + ".sgf"
+		} else {
+			break
+		}
+	}
 
 	var final_error error
 
