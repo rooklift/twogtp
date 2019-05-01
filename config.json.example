@@ -4,32 +4,24 @@
 	"engine_1_args": [
 		"--gtp",
 		"--noponder",
-		"--visits",
-		"1601",
-		"--threads",
-		"1",
-		"--timemanage",
-		"off",
 		"--weights",
 		"networks/f3be3bf826efebef668546146af97c64bdf1c0dac6841dc70bfe777a6195b02d"
 	],
-	"engine_1_commands": [],
+	"engine_1_commands": [
+		"time_settings 0 11 1"
+	],
 
 	"engine_2_name": "Elfv2 (via LZ)",
 	"engine_2_path": "C:\\Programs (self-installed)\\Leela Zero\\leelaz.exe",
 	"engine_2_args": [
 		"--gtp",
 		"--noponder",
-		"--visits",
-		"1601",
-		"--threads",
-		"1",
-		"--timemanage",
-		"off",
 		"--weights",
 		"networks/elf_v2_05dbca15"
 	],
-	"engine_2_commands": [],
+	"engine_2_commands": [
+		"time_settings 0 11 1"
+	],
 
 	"timeout_seconds": 120,
 	"passing_wins": true,
