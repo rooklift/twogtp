@@ -32,6 +32,8 @@ type ConfigStruct struct {
 	PassingWins			bool				`json:"passing_wins"`			// Surprisingly good heuristic for LZ at least
 	Restart				bool				`json:"restart"`
 	Games				int					`json:"games"`
+
+	Size				int
 }
 
 var Config ConfigStruct
@@ -53,6 +55,8 @@ func init() {
 	}
 
 	Config.Timeout *= time.Second
+
+	Config.Size = 19;
 
 	go killer()
 }
@@ -290,7 +294,7 @@ func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 		black, white = white, black
 	}
 
-	root := sgf.NewTree(19)
+	root := sgf.NewTree(Config.Size)
 	root.SetValue("KM", "7.5")
 
 	root.SetValue("C", fmt.Sprintf("Black:  %s\n%v\n\nWhite:  %s\n%v",
@@ -303,7 +307,7 @@ func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 	root.SetValue("PW", white.Name)
 
 	for _, engine := range engines {
-		engine.SendAndReceive("boardsize 19")
+		engine.SendAndReceive(fmt.Sprintf("boardsize %d", Config.Size))
 		engine.SendAndReceive("komi 7.5")
 		engine.SendAndReceive("clear_board")
 		engine.SendAndReceive("clear_cache")		// Always wanted where available
@@ -368,7 +372,7 @@ func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 			}
 		} else {
 			passes_in_a_row = 0
-			node, err = node.PlayMoveColour(sgf.ParseGTP(move, 19), colour)
+			node, err = node.PlayMoveColour(sgf.ParseGTP(move, Config.Size), colour)
 			if err != nil {
 				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
 				engine.Lose(colour)
