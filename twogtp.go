@@ -34,6 +34,7 @@ type ConfigStruct struct {
 	Games				int					`json:"games"`
 
 	Size				int					`json:"size"`
+	Komi				float64				`json:"komi"`
 }
 
 var Config ConfigStruct
@@ -300,7 +301,7 @@ func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 	}
 
 	root := sgf.NewTree(Config.Size)
-	root.SetValue("KM", "7.5")
+	root.SetValue("KM", fmt.Sprintf("%.1f", Config.Komi))
 
 	root.SetValue("C", fmt.Sprintf("Black:  %s\n%v\n\nWhite:  %s\n%v",
 		black.Base,
@@ -313,7 +314,7 @@ func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 
 	for _, engine := range engines {
 		engine.SendAndReceive(fmt.Sprintf("boardsize %d", Config.Size))
-		engine.SendAndReceive("komi 7.5")
+		engine.SendAndReceive(fmt.Sprintf("komi %.1f", Config.Komi))
 		engine.SendAndReceive("clear_board")
 		engine.SendAndReceive("clear_cache")		// Always wanted where available
 

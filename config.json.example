@@ -26,5 +26,7 @@
 	"timeout_seconds": 120,
 	"passing_wins": true,
 	"restart": false,
-	"games": 10
+	"games": 10,
+	"size": 19,
+	"komi": 7.5
 }
