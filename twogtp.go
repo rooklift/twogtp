@@ -386,7 +386,7 @@ func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 			}
 		} else {
 			passes_in_a_row = 0
-			node, err = node.PlayMoveColour(sgf.ParseGTP(move, Config.Size), colour)
+			node, err = node.PlayColour(sgf.ParseGTP(move, Config.Size), colour)
 			if err != nil {
 				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
 				engine.Lose(colour)
