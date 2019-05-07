@@ -235,7 +235,7 @@ func main() {
 
 		first_filename, exists := dyers[new_dyer]
 		if exists {
-			fmt.Printf("\n\nGame was similar to %s", first_filename)
+			fmt.Printf("Game was similar to %s\n\n", first_filename)
 			collisions++
 		} else {
 			dyers[new_dyer] = filename
@@ -440,7 +440,7 @@ func killer() {
 		}
 
 		if time.Now().After(killtime) {
-			fmt.Printf("killer(): timeout\n")
+			fmt.Printf("\n\nkiller(): timeout\n")
 			clean_quit(1, engines)
 		}
 	}
@@ -488,7 +488,7 @@ func (self *ConfigStruct) Save(filename string) {
 
 	outfile, err := os.Create(filename)
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		fmt.Printf("\n%v\n", err)
 		return
 	}
 	defer outfile.Close()
@@ -498,7 +498,7 @@ func (self *ConfigStruct) Save(filename string) {
 
 	err = enc.Encode(self)
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		fmt.Printf("\n%v\n", err)
 		return
 	}
 }
@@ -555,7 +555,6 @@ func (self *ConfigStruct) PrintScores() {
 	format1 := "%-20.20s   %4v %-7v %4v %-7v %4v %-7v\n"
 	format2 := "%-20.20s   %4v %-7.2f %4v %-7.2f %4v %-7.2f\n"
 
-	fmt.Printf("\n")
 	fmt.Printf(format1, "", "", "wins", "", "black", "", "white")
 	fmt.Printf(format2, self.Engine1Name, wins_1, winrate_1, black_wins_1, black_winrate_1, white_wins_1, white_winrate_1)
 	fmt.Printf(format2, self.Engine2Name, wins_2, winrate_2, black_wins_2, black_winrate_2, white_wins_2, white_winrate_2)
