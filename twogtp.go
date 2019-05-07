@@ -455,8 +455,8 @@ func (self *ConfigStruct) PrintScores() {
 	wins_1 := strings.Count(self.Winners, "1")
 	wins_2 := strings.Count(self.Winners, "2")
 
-	winrate_1 := float64(wins_1) / float64(len(self.Winners))
-	winrate_2 := float64(wins_2) / float64(len(self.Winners))
+	winrate_1 := float64(wins_1) / float64(len(self.Winners) - strings.Count(self.Winners, "0"))
+	winrate_2 := float64(wins_2) / float64(len(self.Winners) - strings.Count(self.Winners, "0"))
 
 	black_wins_1 := 0
 	white_wins_1 := 0
