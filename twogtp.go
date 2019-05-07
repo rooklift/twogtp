@@ -49,9 +49,16 @@ func init() {
 		fmt.Printf("Usage: %s config_file\n", filepath.Base(os.Args[0]))
 		os.Exit(1)
 	}
-	file, err := ioutil.ReadFile(os.Args[1])
+
+	d, f := filepath.Split(os.Args[1])
+	err := os.Chdir(d)
 	if err != nil {
-		panic("Couldn't load config file " + os.Args[1])
+		panic("Couldn't change working directory: " + err.Error())
+	}
+
+	file, err := ioutil.ReadFile(f)
+	if err != nil {
+		panic("Couldn't load config file " + f)
 	}
 	err = json.Unmarshal(file, &config)
 	if err != nil {
@@ -206,11 +213,13 @@ func main() {
 		config.PrintScores()
 	}
 
+	_, config_base := filepath.Split(os.Args[1])	// Earlier we did Chdir() to config's dir, so only need base
+
 	for round := len(config.Winners); round < config.Games; round++ {
 
 		root, filename, err := play_game(engines, round)
 
-		config.Save(os.Args[1])						// Save the scores
+		config.Save(config_base)					// Save the scores
 
 		new_dyer := root.Dyer()
 
