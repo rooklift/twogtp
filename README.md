@@ -5,6 +5,7 @@ Connect two Go (game) engines via [Go Text Protocol](https://www.lysator.liu.se/
 * Plays multiple games with alternating colours
 * Crash detection
 * Legality checks
+* Match resumption
 * Timeouts
 * Automatic SGF saving
 

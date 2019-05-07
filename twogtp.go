@@ -28,16 +28,19 @@ type ConfigStruct struct {
 	Engine2Args			[]string			`json:"engine_2_args"`
 	Engine2Commands		[]string			`json:"engine_2_commands"`
 
-	Timeout				time.Duration		`json:"timeout_seconds"`		// Note: at load, is multiplied by time.Second
+	TimeoutSecs			time.Duration		`json:"timeout_seconds"`
 	PassingWins			bool				`json:"passing_wins"`			// Surprisingly good heuristic for LZ at least
 	Restart				bool				`json:"restart"`
 	Games				int					`json:"games"`
 
 	Size				int					`json:"size"`
 	Komi				float64				`json:"komi"`
+
+	Winners				string				`json:"winners"`
 }
 
-var Config ConfigStruct
+var config ConfigStruct
+
 var KillTime = make(chan time.Time, 1024)	// Push back the timeout death of the app by sending to this.
 var RegisterEngine = make(chan *Engine, 8)
 
@@ -50,18 +53,16 @@ func init() {
 	if err != nil {
 		panic("Couldn't load config file " + os.Args[1])
 	}
-	err = json.Unmarshal(file, &Config)
+	err = json.Unmarshal(file, &config)
 	if err != nil {
 		panic("Couldn't parse JSON: " + err.Error())
 	}
 
-	Config.Timeout *= time.Second
-
-	if Config.Size < 1 {
-		Config.Size = 19
+	if config.Size < 1 {
+		config.Size = 19
 	}
-	if Config.Size > 25 {
-		panic("Size not supported: " + strconv.Itoa(Config.Size))
+	if config.Size > 25 {
+		panic("Size not supported: " + strconv.Itoa(config.Size))
 	}
 
 	go killer()
@@ -79,11 +80,6 @@ type Engine struct {
 	Commands	[]string		// GTP commands to be sent at start, e.g. time limit
 
 	Process		*os.Process
-
-	wins_b		int
-	losses_b	int
-	wins_w		int
-	losses_w	int
 }
 
 func (self *Engine) Start(name, path string, args []string, commands []string) {
@@ -141,64 +137,6 @@ func consume_scanner(scanner *bufio.Scanner) {
 	}
 }
 
-func (self *Engine) ScoreElements() []string {
-
-	// name, wins, win%, black_wins, black_win%, white_wins, white_win%
-
-	var ret []string
-
-	wins    := self.wins_b   + self.wins_w
-	losses  := self.losses_b + self.losses_w
-	games   := wins          + losses					// FIXME if we ever have unknowns.
-	games_b := self.wins_b   + self.losses_b
-	games_w := self.wins_w   + self.losses_w
-
-	ret = append(ret, self.Name)
-
-	ret = append(ret, strconv.Itoa(wins))
-	if games > 0 {
-		ret = append(ret, fmt.Sprintf("%.0f%%", 100.0 * float64(wins) / float64(games)))
-	} else {
-		ret = append(ret, "0%")
-	}
-
-	ret = append(ret, strconv.Itoa(self.wins_b))
-	if games_b > 0 {
-		ret = append(ret, fmt.Sprintf("%.0f%%", 100.0 * float64(self.wins_b) / float64(games_b)))
-	} else {
-		ret = append(ret, "0%")
-	}
-
-	ret = append(ret, strconv.Itoa(self.wins_w))
-	if games_w > 0 {
-		ret = append(ret, fmt.Sprintf("%.0f%%", 100.0 * float64(self.wins_w) / float64(games_w)))
-	} else {
-		ret = append(ret, "0%")
-	}
-
-	return ret
-}
-
-func (self *Engine) Win(colour sgf.Colour) {
-	if colour == sgf.BLACK {
-		self.wins_b++
-	} else if colour == sgf.WHITE {
-		self.wins_w++
-	} else {
-		panic("bad colour")
-	}
-}
-
-func (self *Engine) Lose(colour sgf.Colour) {
-	if colour == sgf.BLACK {
-		self.losses_b++
-	} else if colour == sgf.WHITE {
-		self.losses_w++
-	} else {
-		panic("bad colour")
-	}
-}
-
 func (self *Engine) SendAndReceive(msg string) (string, error) {
 
 	msg = strings.TrimSpace(msg)
@@ -250,18 +188,23 @@ func main() {
 
 	a := new(Engine)
 	b := new(Engine)
-	a.Start(Config.Engine1Name, Config.Engine1Path, Config.Engine1Args, Config.Engine1Commands)
-	b.Start(Config.Engine2Name, Config.Engine2Path, Config.Engine2Args, Config.Engine2Commands)
+	a.Start(config.Engine1Name, config.Engine1Path, config.Engine1Args, config.Engine1Commands)
+	b.Start(config.Engine2Name, config.Engine2Path, config.Engine2Args, config.Engine2Commands)
 
 	engines := []*Engine{a, b}
-	swap := false
 
 	dyers := make(map[string]string)				// dyer --> first filename
 	collisions := 0
 
-	for n := 0; n < Config.Games; n++ {
+	if len(config.Winners) > 0 {
+		config.PrintScores()
+	}
 
-		root, filename, err := play_game(engines, swap)
+	for round := len(config.Winners); round < config.Games; round++ {
+
+		root, filename, err := play_game(engines, round)
+
+		config.Save(os.Args[1])						// Save the scores
 
 		new_dyer := root.Dyer()
 
@@ -273,18 +216,16 @@ func main() {
 			dyers[new_dyer] = filename
 		}
 
-		print_scores(engines)
+		config.PrintScores()
 
 		if err != nil {
 			clean_quit(1, engines)
 		}
 
-		if Config.Restart {
+		if config.Restart {
 			engines[0].Restart()
 			engines[1].Restart()
 		}
-
-		swap = !swap
 	}
 
 	fmt.Printf("%d Dyer collisions noted.\n\n", collisions)
@@ -292,16 +233,16 @@ func main() {
 	clean_quit(0, engines)
 }
 
-func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
+func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 
 	black := engines[0]
 	white := engines[1]
-	if swap {
+	if round % 2 == 1 {
 		black, white = white, black
 	}
 
-	root := sgf.NewTree(Config.Size)
-	root.SetValue("KM", fmt.Sprintf("%.1f", Config.Komi))
+	root := sgf.NewTree(config.Size)
+	root.SetValue("KM", fmt.Sprintf("%.1f", config.Komi))
 
 	root.SetValue("C", fmt.Sprintf("Black:  %s\n%v\n\nWhite:  %s\n%v",
 		black.Base,
@@ -313,8 +254,8 @@ func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 	root.SetValue("PW", white.Name)
 
 	for _, engine := range engines {
-		engine.SendAndReceive(fmt.Sprintf("boardsize %d", Config.Size))
-		engine.SendAndReceive(fmt.Sprintf("komi %.1f", Config.Komi))
+		engine.SendAndReceive(fmt.Sprintf("boardsize %d", config.Size))
+		engine.SendAndReceive(fmt.Sprintf("komi %.1f", config.Komi))
 		engine.SendAndReceive("clear_board")
 		engine.SendAndReceive("clear_cache")		// Always wanted where available
 
@@ -357,40 +298,37 @@ func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 
 		fmt.Printf(move + " ")
 
-		KillTime <- time.Now().Add(Config.Timeout)	// Delay the timeout death of this app.
+		KillTime <- time.Now().Add(config.TimeoutSecs * time.Second)	// Delay the timeout death of this app.
 
 		if err != nil {
 			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
-			engine.Lose(colour)
-			opponent.Win(colour.Opposite())
+			config.Win(colour.Opposite())
 			final_error = err						// Set the error to return to caller. This kills the app.
 			break
 		} else if move == "resign" {
 			root.SetValue("RE", fmt.Sprintf("%s+R", colour.Opposite().Upper()))
-			engine.Lose(colour)
-			opponent.Win(colour.Opposite())
+			config.Win(colour.Opposite())
 			break
 		} else if move == "pass" {
 			passes_in_a_row++
 			node = node.PassColour(colour)
-			if Config.PassingWins {
+			if config.PassingWins {
 				root.SetValue("RE", fmt.Sprintf("%s+", colour.Upper()))
 				node.SetValue("C", fmt.Sprintf("%s declared victory.", engine.Base))
-				engine.Win(colour)
-				opponent.Lose(colour.Opposite())
+				config.Win(colour)
 				break
 			}
 			if passes_in_a_row >= 2 {
 				// FIXME: get the result somehow...
+				config.Win(sgf.EMPTY)
 				break
 			}
 		} else {
 			passes_in_a_row = 0
-			node, err = node.PlayColour(sgf.ParseGTP(move, Config.Size), colour)
+			node, err = node.PlayColour(sgf.ParseGTP(move, config.Size), colour)
 			if err != nil {
 				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
-				engine.Lose(colour)
-				opponent.Win(colour.Opposite())
+				config.Win(colour.Opposite())
 				final_error = err					// Set the error to return to caller. This kills the app.
 				break
 			}
@@ -402,15 +340,16 @@ func play_game(engines []*Engine, swap bool) (*sgf.Node, string, error) {
 
 		if err != nil {
 			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Upper()))
-			engine.Win(colour)
-			opponent.Lose(colour.Opposite())
+			config.Win(colour)
 			final_error = err						// Set the error to return to caller. This kills the app.
 			break
 		}
 	}
 
+	fmt.Printf("\n\n")
+
 	if final_error != nil {
-		fmt.Printf("\n\n%v", final_error)
+		fmt.Printf("%v\n\n", final_error)
 	}
 
 	node.Save(outfilename)
@@ -466,15 +405,92 @@ func clean_quit(n int, engines []*Engine) {
 	os.Exit(n)
 }
 
-func print_scores(engines []*Engine) {
+// ---------------------------------------------------------------------------------------------
 
-	format := "%-20.20s   %4v %-7v %4v %-7v %4v %-7v\n"
+func (self *ConfigStruct) Win(colour sgf.Colour) {
 
-	fmt.Printf("\n\n")
-	fmt.Printf(format, "", "", "wins", "", "black", "", "white")
-	for _, engine := range engines {
-		elements := engine.ScoreElements()
-		fmt.Printf(format, elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6])
+	if colour == sgf.EMPTY {
+		self.Winners += "0"								// Draw / unknown result
+		return
 	}
+
+	if len(self.Winners) % 2 == 0 {						// Engine 1 is black
+		if colour == sgf.BLACK {
+			self.Winners += "1"
+		} else {
+			self.Winners += "2"
+		}
+	} else {											// Engine 2 is black
+		if colour == sgf.BLACK {
+			self.Winners += "2"
+		} else {
+			self.Winners += "1"
+		}
+	}
+}
+
+func (self *ConfigStruct) Save(filename string) {
+
+	outfile, err := os.Create(filename)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		return
+	}
+	defer outfile.Close()
+
+	enc := json.NewEncoder(outfile)
+	enc.SetIndent("", "\t")
+
+	err = enc.Encode(self)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		return
+	}
+}
+
+func (self *ConfigStruct) PrintScores() {
+
+	// name, wins, win%, black_wins, black_win%, white_wins, white_win%
+
+	wins_1 := strings.Count(self.Winners, "1")
+	wins_2 := strings.Count(self.Winners, "2")
+
+	winrate_1 := float64(wins_1) / float64(len(self.Winners))
+	winrate_2 := float64(wins_2) / float64(len(self.Winners))
+
+	black_wins_1 := 0
+	white_wins_1 := 0
+	black_wins_2 := 0
+	white_wins_2 := 0
+
+	for n := 0; n < len(self.Winners); n++ {
+		if self.Winners[n] == '1' {
+			if n % 2 == 0 {					// Engine 1 black, engine 2 white
+				black_wins_1++
+			} else {
+				white_wins_1++
+			}
+		} else if self.Winners[n] == '2' {
+			if n % 2 == 0 {					// Engine 1 black, engine 2 white, as above (same condition)
+				white_wins_2++
+			} else {
+				black_wins_2++
+			}
+		}
+	}
+
+	black_winrate_1 := float64(black_wins_1) / float64(black_wins_1 + white_wins_2)
+	black_winrate_2 := float64(black_wins_2) / float64(black_wins_2 + white_wins_1)
+
+	white_winrate_1 := float64(white_wins_1) / float64(white_wins_1 + black_wins_2)
+	white_winrate_2 := float64(white_wins_2) / float64(white_wins_2 + black_wins_1)
+
+	format1 := "%-20.20s   %4v %-7v %4v %-7v %4v %-7v\n"
+	format2 := "%-20.20s   %4v %-7.2f %4v %-7.2f %4v %-7.2f\n"
+
+	fmt.Printf("\n")
+	fmt.Printf(format1, "", "", "wins", "", "black", "", "white")
+	fmt.Printf(format2, self.Engine1Name, wins_1, winrate_1, black_wins_1, black_winrate_1, white_wins_1, white_winrate_1)
+	fmt.Printf(format2, self.Engine2Name, wins_2, winrate_2, black_wins_2, black_winrate_2, white_wins_2, white_winrate_2)
 	fmt.Printf("\n")
 }
