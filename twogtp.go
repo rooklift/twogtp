@@ -65,6 +65,12 @@ func init() {
 		panic("Size not supported: " + strconv.Itoa(config.Size))
 	}
 
+	if len(config.Winners) >= config.Games {
+		fmt.Printf("Match already ended. To play on, delete the winners field from the config file, or increase the games count.\n")
+		config.PrintScores()
+		os.Exit(1)
+	}
+
 	go killer()
 }
 
