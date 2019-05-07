@@ -199,12 +199,22 @@ func main() {
 
 	KillTime <- time.Now().Add(2 * time.Minute)		// 2 minute grace period to start up.
 
-	a := new(Engine)
-	b := new(Engine)
-	a.Start(config.Engine1Name, config.Engine1Path, config.Engine1Args, config.Engine1Commands)
-	b.Start(config.Engine2Name, config.Engine2Path, config.Engine2Args, config.Engine2Commands)
+	engines := []*Engine{new(Engine), new(Engine)}
+	engines[0].Start(config.Engine1Name, config.Engine1Path, config.Engine1Args, config.Engine1Commands)
+	engines[1].Start(config.Engine2Name, config.Engine2Path, config.Engine2Args, config.Engine2Commands)
 
-	engines := []*Engine{a, b}
+	// Check the engines started up successfully...
+	// If not, abort without taking any action.
+
+	if _, err := engines[0].SendAndReceive("name"); err != nil {
+		fmt.Printf("%v\n", err)
+		clean_quit(1, engines)
+	}
+
+	if _, err := engines[1].SendAndReceive("name"); err != nil {
+		fmt.Printf("%v\n", err)
+		clean_quit(1, engines)
+	}
 
 	dyers := make(map[string]string)				// dyer --> first filename
 	collisions := 0

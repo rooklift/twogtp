@@ -30,6 +30,5 @@
 	"restart": false,
 	"games": 100,
 	"size": 19,
-	"komi": 7.5,
-	"winners": "2111222222121111"
+	"komi": 7.5
 }
