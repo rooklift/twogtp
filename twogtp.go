@@ -455,8 +455,14 @@ func (self *ConfigStruct) PrintScores() {
 	wins_1 := strings.Count(self.Winners, "1")
 	wins_2 := strings.Count(self.Winners, "2")
 
-	winrate_1 := float64(wins_1) / float64(len(self.Winners) - strings.Count(self.Winners, "0"))
-	winrate_2 := float64(wins_2) / float64(len(self.Winners) - strings.Count(self.Winners, "0"))
+	var winrate_1, winrate_2 float64
+
+	valid_games := len(self.Winners) - strings.Count(self.Winners, "0")
+
+	if valid_games > 0 {
+		winrate_1 := float64(wins_1) / float64(valid_games)
+		winrate_2 := float64(wins_2) / float64(valid_games)
+	}
 
 	black_wins_1 := 0
 	white_wins_1 := 0
@@ -479,11 +485,17 @@ func (self *ConfigStruct) PrintScores() {
 		}
 	}
 
-	black_winrate_1 := float64(black_wins_1) / float64(black_wins_1 + white_wins_2)
-	black_winrate_2 := float64(black_wins_2) / float64(black_wins_2 + white_wins_1)
+	var black_winrate_1, black_winrate_2, white_winrate_1, white_winrate_2 float64
 
-	white_winrate_1 := float64(white_wins_1) / float64(white_wins_1 + black_wins_2)
-	white_winrate_2 := float64(white_wins_2) / float64(white_wins_2 + black_wins_1)
+	if black_wins_1 + white_wins_2 > 0 {
+		black_winrate_1 = float64(black_wins_1) / float64(black_wins_1 + white_wins_2)
+		white_winrate_2 = float64(white_wins_2) / float64(black_wins_1 + white_wins_2)
+	}
+
+	if black_wins_2 + white_wins_1 > 0 {
+		black_winrate_2 = float64(black_wins_2) / float64(black_wins_2 + white_wins_1)
+		white_winrate_1 = float64(white_wins_1) / float64(black_wins_2 + white_wins_1)
+	}
 
 	format1 := "%-20.20s   %4v %-7v %4v %-7v %4v %-7v\n"
 	format2 := "%-20.20s   %4v %-7.2f %4v %-7.2f %4v %-7.2f\n"
