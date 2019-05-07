@@ -301,34 +301,58 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 		KillTime <- time.Now().Add(config.TimeoutSecs * time.Second)	// Delay the timeout death of this app.
 
 		if err != nil {
-			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
-			config.Win(colour.Opposite())
+
+			re := fmt.Sprintf("%s+F", colour.Opposite().Upper())
+			config.Win(re)
+			root.SetValue("RE", re)
+			fmt.Printf(re)
+
 			final_error = err						// Set the error to return to caller. This kills the app.
 			break
+
 		} else if move == "resign" {
-			root.SetValue("RE", fmt.Sprintf("%s+R", colour.Opposite().Upper()))
-			config.Win(colour.Opposite())
+
+			re := fmt.Sprintf("%s+R", colour.Opposite().Upper())
+			config.Win(re)
+			root.SetValue("RE", re)
+			fmt.Printf(re)
+
 			break
+
 		} else if move == "pass" {
+
 			passes_in_a_row++
 			node = node.PassColour(colour)
+
 			if config.PassingWins {
-				root.SetValue("RE", fmt.Sprintf("%s+", colour.Upper()))
+
+				re := fmt.Sprintf("%s+", colour.Upper())
+				config.Win(re)
+				root.SetValue("RE", re)
+				fmt.Printf(re)
+
 				node.SetValue("C", fmt.Sprintf("%s declared victory.", engine.Base))
-				config.Win(colour)
 				break
 			}
+
 			if passes_in_a_row >= 2 {
 				// FIXME: get the result somehow...
-				config.Win(sgf.EMPTY)
+				config.Win("")
 				break
 			}
+
 		} else {
+
 			passes_in_a_row = 0
 			node, err = node.PlayColour(sgf.ParseGTP(move, config.Size), colour)
+
 			if err != nil {
-				root.SetValue("RE", fmt.Sprintf("%s+F", colour.Opposite().Upper()))
-				config.Win(colour.Opposite())
+
+				re := fmt.Sprintf("%s+F", colour.Opposite().Upper())
+				config.Win(re)
+				root.SetValue("RE", re)
+				fmt.Printf(re)
+
 				final_error = err					// Set the error to return to caller. This kills the app.
 				break
 			}
@@ -339,8 +363,12 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 		_, err = opponent.SendAndReceive(fmt.Sprintf("play %s %s", colour.Lower(), move))
 
 		if err != nil {
-			root.SetValue("RE", fmt.Sprintf("%s+F", colour.Upper()))
-			config.Win(colour)
+
+			re := fmt.Sprintf("%s+F", colour.Upper())
+			config.Win(re)
+			root.SetValue("RE", re)
+			fmt.Printf(re)
+
 			final_error = err						// Set the error to return to caller. This kills the app.
 			break
 		}
@@ -407,21 +435,23 @@ func clean_quit(n int, engines []*Engine) {
 
 // ---------------------------------------------------------------------------------------------
 
-func (self *ConfigStruct) Win(colour sgf.Colour) {
+func (self *ConfigStruct) Win(re string) {
 
-	if colour == sgf.EMPTY {
+	// re is something like "B+R"
+
+	if len(re) == 0 || (re[0] != 'B' && re[0] != 'W') {
 		self.Winners += "0"								// Draw / unknown result
 		return
 	}
 
 	if len(self.Winners) % 2 == 0 {						// Engine 1 is black
-		if colour == sgf.BLACK {
+		if re[0] == 'B' {
 			self.Winners += "1"
 		} else {
 			self.Winners += "2"
 		}
 	} else {											// Engine 2 is black
-		if colour == sgf.BLACK {
+		if re[0] == 'B' {
 			self.Winners += "2"
 		} else {
 			self.Winners += "1"
@@ -460,8 +490,8 @@ func (self *ConfigStruct) PrintScores() {
 	valid_games := len(self.Winners) - strings.Count(self.Winners, "0")
 
 	if valid_games > 0 {
-		winrate_1 := float64(wins_1) / float64(valid_games)
-		winrate_2 := float64(wins_2) / float64(valid_games)
+		winrate_1 = float64(wins_1) / float64(valid_games)
+		winrate_2 = float64(wins_2) / float64(valid_games)
 	}
 
 	black_wins_1 := 0
