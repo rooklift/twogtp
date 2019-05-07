@@ -317,7 +317,7 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 
 		if err != nil {
 
-			re := fmt.Sprintf("%s+F", colour.Opposite().Upper())
+			re := fmt.Sprintf("Void")
 			config.Win(re)
 			root.SetValue("RE", re)
 			fmt.Printf(re)
@@ -363,7 +363,7 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 
 			if err != nil {
 
-				re := fmt.Sprintf("%s+F", colour.Opposite().Upper())
+				re := fmt.Sprintf("Void")
 				config.Win(re)
 				root.SetValue("RE", re)
 				fmt.Printf(re)
@@ -379,7 +379,7 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 
 		if err != nil {
 
-			re := fmt.Sprintf("%s+F", colour.Upper())
+			re := fmt.Sprintf("Void")
 			config.Win(re)
 			root.SetValue("RE", re)
 			fmt.Printf(re)
