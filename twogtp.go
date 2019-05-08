@@ -360,12 +360,14 @@ func killer() {
 
 func clean_quit(n int, engines []*Engine) {
 	for _, engine := range engines {
-		fmt.Printf("Killing %s...", engine.Name)
-		err := engine.Process.Kill()
-		if err != nil {
-			fmt.Printf(" %v", err)
+		if engine != nil && engine.Process != nil {
+			fmt.Printf("Killing %s...", engine.Name)
+			err := engine.Process.Kill()
+			if err != nil {
+				fmt.Printf(" %v", err)
+			}
+			fmt.Printf("\n")
 		}
-		fmt.Printf("\n")
 	}
 	os.Exit(n)
 }
