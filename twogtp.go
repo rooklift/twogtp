@@ -97,7 +97,7 @@ func init() {
 	}
 
 	if len(config.Winners) >= config.Games {
-		fmt.Printf("Match already ended. To play on, delete the winners field from the config file, or increase the games count.\n")
+		fmt.Printf("\nMatch already ended. To play on, delete the winners field from the config file, or increase the games count.\n\n")
 		config.PrintScores()
 		os.Exit(1)
 	}
@@ -123,6 +123,7 @@ func main() {
 	collisions := 0
 
 	if len(config.Winners) > 0 {
+		fmt.Printf("\n")
 		config.PrintScores()
 	}
 
