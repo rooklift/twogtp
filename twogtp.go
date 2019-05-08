@@ -260,32 +260,34 @@ func main() {
 
 func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 
-	black := engines[0]
-	white := engines[1]
-	if round % 2 == 1 {
-		black, white = white, black
+	var black_engine, white_engine *Engine
+
+	if round % 2 == 0 {
+		black_engine, white_engine = engines[0], engines[1]
+	} else {
+		black_engine, white_engine = engines[1], engines[0]
 	}
 
 	root := sgf.NewTree(config.Size)
 	root.SetValue("KM", fmt.Sprintf("%.1f", config.Komi))
 
 	root.SetValue("C", fmt.Sprintf("Black:  %s\n%v\n\nWhite:  %s\n%v",
-		black.Base,
-		black.Args,
-		white.Base,
-		white.Args))
+		black_engine.Base,
+		black_engine.Args,
+		white_engine.Base,
+		white_engine.Args))
 
-	root.SetValue("PB", black.Name)
-	root.SetValue("PW", white.Name)
+	root.SetValue("PB", black_engine.Name)
+	root.SetValue("PW", white_engine.Name)
 
-	for _, engine := range engines {
-		engine.SendAndReceive(fmt.Sprintf("boardsize %d", config.Size))
-		engine.SendAndReceive(fmt.Sprintf("komi %.1f", config.Komi))
-		engine.SendAndReceive("clear_board")
-		engine.SendAndReceive("clear_cache")		// Always wanted where available
+	for _, e := range engines {
+		e.SendAndReceive(fmt.Sprintf("boardsize %d", config.Size))
+		e.SendAndReceive(fmt.Sprintf("komi %.1f", config.Komi))
+		e.SendAndReceive("clear_board")
+		e.SendAndReceive("clear_cache")		// Always wanted where available
 
-		for _, command := range engine.Commands {
-			engine.SendAndReceive(command)
+		for _, command := range e.Commands {
+			e.SendAndReceive(command)
 		}
 	}
 
@@ -305,14 +307,18 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 
 	var final_error error
 
-	colour := sgf.WHITE			// Swapped at start of loop...
+	for turn := 0; true; turn++ {
 
-	for {
-		colour = colour.Opposite()
-
+		var colour sgf.Colour
 		var engine, opponent *Engine
-		if colour == sgf.BLACK { engine, opponent = black, white }
-		if colour == sgf.WHITE { engine, opponent = white, black }
+
+		if turn % 2 == 0 {
+			colour = sgf.BLACK
+			engine, opponent = black_engine, white_engine
+		} else {
+			colour = sgf.WHITE
+			engine, opponent = white_engine, black_engine
+		}
 
 		if time.Now().Sub(last_save_time) > 5 * time.Second {
 			node.Save(outfilename)
