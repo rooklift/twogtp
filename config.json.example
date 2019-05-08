@@ -1,34 +1,45 @@
 {
-	"engine_1_name": "Leela Zero 225",
-	"engine_1_path": "../leela-zero/build/leelaz",
-	"engine_1_args": [
-		"--gtp",
-		"--noponder",
-		"--visits",
-		"32",
-		"--weights",
-		"networks/d42f950a"
-	],
-	"engine_1_commands": [
-		"time_settings 0 11 1"
-	],
-	"engine_2_name": "Leela Zero 224",
-	"engine_2_path": "../leela-zero/build/leelaz",
-	"engine_2_args": [
-		"--gtp",
-		"--noponder",
-		"--visits",
-		"32",
-		"--weights",
-		"networks/f3be3bf8"
-	],
-	"engine_2_commands": [
-		"time_settings 0 11 1"
+	"engines": [
+		{
+			"name": "Leela Zero 225",
+			"path": "../leela-zero/build/leelaz",
+			"args": [
+				"--gtp",
+				"--noponder",
+				"--visits",
+				"32",
+				"--threads",
+				"1",
+				"--weights",
+				"networks/d42f950a"
+			],
+			"commands": [
+				"time_settings 0 11 1"
+			]
+		},
+		{
+			"name": "Random",
+			"path": "../gtp/examples/random",
+			"args": [
+				"--gtp",
+				"--noponder",
+				"--visits",
+				"32",
+				"--threads",
+				"1",
+				"--weights",
+				"networks/f3be3bf8"
+			],
+			"commands": [
+				"time_settings 0 11 1"
+			]
+		}
 	],
 	"timeout_seconds": 120,
 	"passing_wins": true,
 	"restart": false,
 	"games": 100,
 	"size": 19,
-	"komi": 7.5
+	"komi": 7.5,
+	"winners": "2111"
 }

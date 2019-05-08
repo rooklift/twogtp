@@ -17,16 +17,15 @@ import (
 	"github.com/fohristiwhirl/sgf"
 )
 
-type ConfigStruct struct {
-	Engine1Name			string				`json:"engine_1_name"`
-	Engine1Path			string				`json:"engine_1_path"`
-	Engine1Args			[]string			`json:"engine_1_args"`
-	Engine1Commands		[]string			`json:"engine_1_commands"`
+type EngineConfig struct {
+	Name				string				`json:"name"`
+	Path				string				`json:"path"`
+	Args				[]string			`json:"args"`
+	Commands			[]string			`json:"commands"`
+}
 
-	Engine2Name			string				`json:"engine_2_name"`
-	Engine2Path			string				`json:"engine_2_path"`
-	Engine2Args			[]string			`json:"engine_2_args"`
-	Engine2Commands		[]string			`json:"engine_2_commands"`
+type ConfigStruct struct {
+	EngineCfg			[]*EngineConfig		`json:"engines"`
 
 	TimeoutSecs			time.Duration		`json:"timeout_seconds"`
 	PassingWins			bool				`json:"passing_wins"`			// Surprisingly good heuristic for LZ at least
@@ -69,6 +68,9 @@ func init() {
 	}
 
 	d, f := filepath.Split(os.Args[1])
+	if d == "" {
+		d = "."
+	}
 	err := os.Chdir(d)
 	if err != nil {
 		panic("Couldn't change working directory: " + err.Error())
@@ -90,6 +92,10 @@ func init() {
 		panic("Size not supported: " + strconv.Itoa(config.Size))
 	}
 
+	if len(config.EngineCfg) != 2 {
+		panic("Expected 2 engines, got: " + strconv.Itoa(len(config.EngineCfg)))
+	}
+
 	if len(config.Winners) >= config.Games {
 		fmt.Printf("Match already ended. To play on, delete the winners field from the config file, or increase the games count.\n")
 		config.PrintScores()
@@ -104,20 +110,13 @@ func main() {
 	KillTime <- time.Now().Add(2 * time.Minute)		// 2 minute grace period to start up.
 
 	engines := []*Engine{new(Engine), new(Engine)}
-	engines[0].Start(config.Engine1Name, config.Engine1Path, config.Engine1Args, config.Engine1Commands)
-	engines[1].Start(config.Engine2Name, config.Engine2Path, config.Engine2Args, config.Engine2Commands)
 
-	// Check the engines started up successfully...
-	// If not, abort without taking any action.
-
-	if _, err := engines[0].SendAndReceive("name"); err != nil {
-		fmt.Printf("%v\n", err)
-		clean_quit(1, engines)
-	}
-
-	if _, err := engines[1].SendAndReceive("name"); err != nil {
-		fmt.Printf("%v\n", err)
-		clean_quit(1, engines)
+	for n, e := range engines {
+		e.Start(config.EngineCfg[n].Name, config.EngineCfg[n].Path, config.EngineCfg[n].Args, config.EngineCfg[n].Commands)
+		if _, err := e.SendAndReceive("name"); err != nil {
+			fmt.Printf("%v\n", err)
+			clean_quit(1, engines)
+		}
 	}
 
 	dyers := make(map[string]string)				// dyer --> first filename
@@ -266,7 +265,7 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 				root.SetValue("RE", re)
 				fmt.Printf(re)
 
-				node.SetValue("C", fmt.Sprintf("%s declared victory.", engine.Base))
+				node.SetValue("C", fmt.Sprintf("%s declared victory.", engine.Name))
 				break
 			}
 
@@ -468,8 +467,8 @@ func (self *ConfigStruct) PrintScores() {
 	format2 := "%-20.20s   %4v %-7.2f %4v %-7.2f %4v %-7.2f\n"
 
 	fmt.Printf(format1, "", "", "wins", "", "black", "", "white")
-	fmt.Printf(format2, self.Engine1Name, wins_1, winrate_1, black_wins_1, black_winrate_1, white_wins_1, white_winrate_1)
-	fmt.Printf(format2, self.Engine2Name, wins_2, winrate_2, black_wins_2, black_winrate_2, white_wins_2, white_winrate_2)
+	fmt.Printf(format2, self.EngineCfg[0].Name, wins_1, winrate_1, black_wins_1, black_winrate_1, white_wins_1, white_winrate_1)
+	fmt.Printf(format2, self.EngineCfg[1].Name, wins_2, winrate_2, black_wins_2, black_winrate_2, white_wins_2, white_winrate_2)
 	fmt.Printf("\n")
 }
 
@@ -571,6 +570,6 @@ func (self *Engine) SendAndReceive(msg string) (string, error) {
 
 func consume_scanner(scanner *bufio.Scanner) {
 	for scanner.Scan() {								// Will end when the pipe closes due to an engine restart.
-		// fmt.Printf("%s\n", self.stderr.Text())
+		// fmt.Printf("%s\n", scanner.Text())
 	}
 }
