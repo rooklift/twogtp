@@ -39,10 +39,28 @@ type ConfigStruct struct {
 	Winners				string				`json:"winners"`
 }
 
+type Engine struct {
+	Stdin		io.WriteCloser
+	Stdout		*bufio.Scanner
+
+	Name		string			// For the SGF "PB" or "PW" properties
+	Dir			string			// Working directory
+	Base		string			// Command name, e.g. "leelaz.exe"
+
+	Args		[]string		// Not including base
+	Commands	[]string		// GTP commands to be sent at start, e.g. time limit
+
+	Process		*os.Process
+}
+
+// -----------------------------------------------------------------------------
+
 var config ConfigStruct
 
 var KillTime = make(chan time.Time, 1024)	// Push back the timeout death of the app by sending to this.
 var RegisterEngine = make(chan *Engine, 8)
+
+// -----------------------------------------------------------------------------
 
 func init() {
 	if len(os.Args) < 2 {
@@ -79,120 +97,6 @@ func init() {
 	}
 
 	go killer()
-}
-
-type Engine struct {
-	Stdin		io.WriteCloser
-	Stdout		*bufio.Scanner
-
-	Name		string			// For the SGF "PB" or "PW" properties
-	Dir			string			// Working directory
-	Base		string			// Command name, e.g. "leelaz.exe"
-
-	Args		[]string		// Not including base
-	Commands	[]string		// GTP commands to be sent at start, e.g. time limit
-
-	Process		*os.Process
-}
-
-func (self *Engine) Start(name, path string, args []string, commands []string) {
-
-	self.Name = name
-	self.Dir = filepath.Dir(path)
-	self.Base = filepath.Base(path)
-
-	self.Args = make([]string, len(args))
-	copy(self.Args, args)
-
-	self.Commands = make([]string, len(commands))
-	copy(self.Commands, commands)
-
-	self.Restart()
-
-	RegisterEngine <- self			// Let the killer goroutine know we exist
-}
-
-func (self *Engine) Restart() {
-
-	if self.Process != nil {
-		self.Process.Kill()
-	}
-
-	var cmd exec.Cmd
-
-	cmd.Dir = self.Dir
-	cmd.Path = self.Base
-	cmd.Args = append([]string{self.Base}, self.Args...)
-
-	var err1 error
-	self.Stdin, err1 = cmd.StdinPipe()
-
-	stdout_pipe, err2 := cmd.StdoutPipe()
-	self.Stdout = bufio.NewScanner(stdout_pipe)
-
-	stderr_pipe, err3 := cmd.StderrPipe()
-	stderr := bufio.NewScanner(stderr_pipe)
-
-	err4 := cmd.Start()
-
-	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
-		panic(fmt.Sprintf("\nerr1: %v\nerr2: %v\nerr3: %v\nerr4: %v\n", err1, err2, err3, err4))
-	}
-
-	self.Process = cmd.Process
-
-	go consume_scanner(stderr)
-}
-
-func consume_scanner(scanner *bufio.Scanner) {
-	for scanner.Scan() {								// Will end when the pipe closes due to an engine restart.
-		// fmt.Printf("%s\n", self.stderr.Text())
-	}
-}
-
-func (self *Engine) SendAndReceive(msg string) (string, error) {
-
-	msg = strings.TrimSpace(msg)
-	fmt.Fprintf(self.Stdin, "%s\n", msg)
-
-	var buf bytes.Buffer
-
-	for self.Stdout.Scan() {
-
-		t := self.Stdout.Text()
-		if len(t) > 0 && buf.Len() > 0 {	// We got a meaningful line, and already had some, so add a \n between them.
-			buf.WriteString("\n")
-		}
-		buf.WriteString(t)
-
-		if len(t) == 0 {					// Last scan was an empty line, meaning the response has ended.
-
-			s := strings.TrimSpace(buf.String())
-
-			if len(s) == 0 {				// Didn't even get an =
-				return "", fmt.Errorf("SendAndReceive(): got empty response")
-			}
-
-			if s[0] != '=' {
-				return "", fmt.Errorf("SendAndReceive(): got reply: %s", strings.TrimSpace(s))
-			}
-
-			// Seems we got a sane response.
-			// Return everything except the leading ID thing...
-
-			i := 0
-
-			for i < len(s) && (s[i] == '=' || s[i] >= '0' && s[i] <= '9') {
-				i++
-			}
-
-			return strings.TrimSpace(s[i:]), nil
-		}
-	}
-
-	// If we get to here, Scan() returned false, likely meaning the engine is dead.
-
-	return "", fmt.Errorf("SendAndReceive(): %s crashed", self.Name)
 }
 
 func main() {
@@ -415,6 +319,8 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 	return node.GetRoot(), outfilename, final_error
 }
 
+// -----------------------------------------------------------------------------
+
 func killer() {
 
 	// Kill the app if we get past the most recent deadline sent to us.
@@ -565,4 +471,106 @@ func (self *ConfigStruct) PrintScores() {
 	fmt.Printf(format2, self.Engine1Name, wins_1, winrate_1, black_wins_1, black_winrate_1, white_wins_1, white_winrate_1)
 	fmt.Printf(format2, self.Engine2Name, wins_2, winrate_2, black_wins_2, black_winrate_2, white_wins_2, white_winrate_2)
 	fmt.Printf("\n")
+}
+
+// ---------------------------------------------------------------------------------------------
+
+func (self *Engine) Start(name, path string, args []string, commands []string) {
+
+	self.Name = name
+	self.Dir = filepath.Dir(path)
+	self.Base = filepath.Base(path)
+
+	self.Args = make([]string, len(args))
+	copy(self.Args, args)
+
+	self.Commands = make([]string, len(commands))
+	copy(self.Commands, commands)
+
+	self.Restart()
+
+	RegisterEngine <- self			// Let the killer goroutine know we exist
+}
+
+func (self *Engine) Restart() {
+
+	if self.Process != nil {
+		self.Process.Kill()
+	}
+
+	var cmd exec.Cmd
+
+	cmd.Dir = self.Dir
+	cmd.Path = self.Base
+	cmd.Args = append([]string{self.Base}, self.Args...)
+
+	var err1 error
+	self.Stdin, err1 = cmd.StdinPipe()
+
+	stdout_pipe, err2 := cmd.StdoutPipe()
+	self.Stdout = bufio.NewScanner(stdout_pipe)
+
+	stderr_pipe, err3 := cmd.StderrPipe()
+	stderr := bufio.NewScanner(stderr_pipe)
+
+	err4 := cmd.Start()
+
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		panic(fmt.Sprintf("\nerr1: %v\nerr2: %v\nerr3: %v\nerr4: %v\n", err1, err2, err3, err4))
+	}
+
+	self.Process = cmd.Process
+
+	go consume_scanner(stderr)
+}
+
+func (self *Engine) SendAndReceive(msg string) (string, error) {
+
+	msg = strings.TrimSpace(msg)
+	fmt.Fprintf(self.Stdin, "%s\n", msg)
+
+	var buf bytes.Buffer
+
+	for self.Stdout.Scan() {
+
+		t := self.Stdout.Text()
+		if len(t) > 0 && buf.Len() > 0 {	// We got a meaningful line, and already had some, so add a \n between them.
+			buf.WriteString("\n")
+		}
+		buf.WriteString(t)
+
+		if len(t) == 0 {					// Last scan was an empty line, meaning the response has ended.
+
+			s := strings.TrimSpace(buf.String())
+
+			if len(s) == 0 {				// Didn't even get an =
+				return "", fmt.Errorf("SendAndReceive(): got empty response")
+			}
+
+			if s[0] != '=' {
+				return "", fmt.Errorf("SendAndReceive(): got reply: %s", strings.TrimSpace(s))
+			}
+
+			// Seems we got a sane response.
+			// Return everything except the leading ID thing...
+
+			i := 0
+
+			for i < len(s) && (s[i] == '=' || s[i] >= '0' && s[i] <= '9') {
+				i++
+			}
+
+			return strings.TrimSpace(s[i:]), nil
+		}
+	}
+
+	// If we get to here, Scan() returned false, likely meaning the engine is dead.
+
+	return "", fmt.Errorf("SendAndReceive(): %s crashed", self.Name)
+}
+
+func consume_scanner(scanner *bufio.Scanner) {
+	for scanner.Scan() {								// Will end when the pipe closes due to an engine restart.
+		// fmt.Printf("%s\n", self.stderr.Text())
+	}
 }
