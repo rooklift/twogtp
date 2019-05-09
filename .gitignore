@@ -4,3 +4,4 @@
 *.json
 twogtp
 matches/*
+check_dupes
