@@ -20,19 +20,8 @@
 		{
 			"name": "Random",
 			"path": "../gtp/examples/random",
-			"args": [
-				"--gtp",
-				"--noponder",
-				"--visits",
-				"32",
-				"--threads",
-				"1",
-				"--weights",
-				"networks/f3be3bf8"
-			],
-			"commands": [
-				"time_settings 0 11 1"
-			]
+			"args": [],
+			"commands": []
 		}
 	],
 	"timeout_seconds": 120,
