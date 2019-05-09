@@ -5,20 +5,37 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fohristiwhirl/sgf"
 )
 
 func main() {
+
+	if len(os.Args) < 2 {
+		return
+	}
+
+	files, err := ioutil.ReadDir(os.Args[1])
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		return
+	}
+
 	var dyers = make(map[string]string)			// dyer --> filename
-	files, _ := ioutil.ReadDir(".")
 	count := 0
 
 	for _, file := range files {
+
 		filename := file.Name()
+		
 		if strings.HasSuffix(filename, ".sgf") {
-			root, err := sgf.Load(filename)
+
+			full_path := filepath.Join(os.Args[1], filename)
+
+			root, err := sgf.Load(full_path)
 			if err != nil {
 				fmt.Printf("%v\n", err)
 			}
