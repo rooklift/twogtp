@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -71,35 +70,41 @@ func init() {
 	if d == "" {
 		d = "."
 	}
+
 	err := os.Chdir(d)
 	if err != nil {
-		panic("Couldn't change working directory: " + err.Error())
+		fmt.Printf("Couldn't change working directory: %v\n", err)
+		os.Exit(1)
 	}
 
 	file, err := ioutil.ReadFile(f)
 	if err != nil {
-		panic("Couldn't load config file " + f)
+		fmt.Printf("Couldn't load config file: %v\n", err)
+		os.Exit(1)
 	}
+
 	err = json.Unmarshal(file, &config)
 	if err != nil {
-		panic("Couldn't parse JSON: " + err.Error())
+		fmt.Printf("Couldn't parse JSON: %v\n", err)
+		os.Exit(1)
 	}
 
 	if config.Size < 1 {
 		config.Size = 19
-	}
-	if config.Size > 25 {
-		panic("Size not supported: " + strconv.Itoa(config.Size))
+	} else if config.Size > 25 {
+		fmt.Printf("Size %d not supported\n", config.Size)
+		os.Exit(1)
 	}
 
 	if len(config.EngineCfg) != 2 {
-		panic("Expected 2 engines, got: " + strconv.Itoa(len(config.EngineCfg)))
+		fmt.Printf("Expected 2 engines, got %d\n", len(config.EngineCfg))
+		os.Exit(1)
 	}
 
 	if len(config.Winners) >= config.Games {
 		fmt.Printf("\nMatch already ended. To play on, delete the winners field from the config file, or increase the games count.\n\n")
 		config.PrintScores()
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	go killer()
