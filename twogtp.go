@@ -204,16 +204,6 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 	passes_in_a_row := 0
 	node := root
 
-	outfilename := time.Now().Format("20060102-15-04-05") + ".sgf"
-	for appendix := byte('a'); appendix <= 'z'; appendix++ {
-		_, err := os.Stat(outfilename)
-		if err == nil {					// File exists...
-			outfilename = time.Now().Format("20060102-15-04-05") + string([]byte{appendix}) + ".sgf"
-		} else {
-			break
-		}
-	}
-
 	var final_error error
 
 	for turn := 0; true; turn++ {
@@ -230,7 +220,7 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 		}
 
 		if time.Now().Sub(last_save_time) > 5 * time.Second {
-			node.Save(outfilename)
+			node.Save("current.sgf")
 			last_save_time = time.Now()
 		}
 
@@ -320,7 +310,19 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 		fmt.Printf("%v\n\n", final_error)
 	}
 
+	outfilename := time.Now().Format("20060102-15-04-05") + ".sgf"
+	for appendix := byte('a'); appendix <= 'z'; appendix++ {
+		_, err := os.Stat(outfilename)
+		if err == nil {					// File exists...
+			outfilename = time.Now().Format("20060102-15-04-05") + string([]byte{appendix}) + ".sgf"
+		} else {
+			break
+		}
+	}
+
 	node.Save(outfilename)
+	os.Remove("current.sgf")
+
 	return node.GetRoot(), outfilename, final_error
 }
 
