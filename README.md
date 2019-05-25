@@ -8,6 +8,7 @@ Connect two Go (game) engines via [Go Text Protocol](https://www.lysator.liu.se/
 # Features
 
 * Plays multiple games with alternating colours
+* Optional forced opening via SGF file
 * Crash detection
 * Legality checks
 * Match resumption
