@@ -1,8 +1,8 @@
 {
 	"engines": [
 		{
-			"name": "Leela Zero 225",
-			"path": "../leela-zero/build/leelaz",
+			"name": "Leela Zero 226",
+			"path": "C:\\Programs (self-installed)\\leela-zero\\leelaz.exe",
 			"args": [
 				"--gtp",
 				"--noponder",
@@ -11,7 +11,7 @@
 				"--threads",
 				"1",
 				"--weights",
-				"networks/d42f950a"
+				"networks/a20c31da0db23da6efc16739b2e62b058b2ff86060512c58ef6fefe14a0e2a82.gz"
 			],
 			"commands": [
 				"time_settings 0 11 1"
@@ -29,5 +29,6 @@
 	"restart": false,
 	"games": 100,
 	"size": 19,
-	"komi": 7.5
+	"komi": 7.5,
+	"opening": "foo.sgf"
 }

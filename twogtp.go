@@ -33,6 +33,7 @@ type ConfigStruct struct {
 
 	Size				int					`json:"size"`
 	Komi				float64				`json:"komi"`
+	Opening				string				`json:"opening"`
 
 	Winners				string				`json:"winners"`
 }
@@ -89,7 +90,16 @@ func init() {
 		os.Exit(1)
 	}
 
-	if config.Size < 1 {
+	if config.Opening != "" {
+		root, err := sgf.Load(config.Opening)
+		if err != nil {
+			fmt.Printf("Couldn't load %s: %v\n", config.Opening, err)
+			os.Exit(1)
+		}
+		config.Size = root.RootBoardSize()
+	}
+
+	if config.Size < 1 {			// Note this must come after the opening SGF load, above.
 		config.Size = 19
 	} else if config.Size > 25 {
 		fmt.Printf("Size %d not supported\n", config.Size)
@@ -177,7 +187,18 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 		black_engine, white_engine = engines[1], engines[0]
 	}
 
-	root := sgf.NewTree(config.Size)
+	var root *sgf.Node
+
+	if config.Opening != "" {
+		var err error
+		root, err = sgf.Load(config.Opening)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		root = sgf.NewTree(config.Size)
+	}
+
 	root.SetValue("KM", fmt.Sprintf("%.1f", config.Komi))
 
 	root.SetValue("C", fmt.Sprintf("Black:  %s\n%v\n\nWhite:  %s\n%v",
@@ -189,6 +210,8 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 	root.SetValue("PB", black_engine.Name)
 	root.SetValue("PW", white_engine.Name)
 
+	node := root.GetEnd()
+
 	for _, e := range engines {
 		e.SendAndReceive(fmt.Sprintf("boardsize %d", config.Size))
 		e.SendAndReceive(fmt.Sprintf("komi %.1f", config.Komi))
@@ -198,25 +221,33 @@ func play_game(engines []*Engine, round int) (*sgf.Node, string, error) {
 		for _, command := range e.Commands {
 			e.SendAndReceive(command)
 		}
+
+		line := node.GetLine()
+
+		for _, z := range line {
+			node_commands := node_gtp(z, config.Size)
+			for _, command := range node_commands {
+				e.SendAndReceive(command)
+			}
+		}
 	}
 
 	last_save_time := time.Now()
 	passes_in_a_row := 0
-	node := root
 
 	var final_error error
 
-	for turn := 0; true; turn++ {
+	for {
 
 		var colour sgf.Colour
 		var engine, opponent *Engine
 
-		if turn % 2 == 0 {
-			colour = sgf.BLACK
-			engine, opponent = black_engine, white_engine
-		} else {
+		if len(node.AllValues("B")) != 0 || len(node.AllValues("AB")) != 0 {
 			colour = sgf.WHITE
 			engine, opponent = white_engine, black_engine
+		} else {														// The default.
+			colour = sgf.BLACK
+			engine, opponent = black_engine, white_engine
 		}
 
 		if time.Now().Sub(last_save_time) > 5 * time.Second {
@@ -578,8 +609,61 @@ func (self *Engine) SendAndReceive(msg string) (string, error) {
 	return "", fmt.Errorf("SendAndReceive(): %s crashed", self.Name)
 }
 
+// ---------------------------------------------------------------------------------------------
+
 func consume_scanner(scanner *bufio.Scanner) {
 	for scanner.Scan() {								// Will end when the pipe closes due to an engine restart.
 		// fmt.Printf("%s\n", scanner.Text())
 	}
+}
+
+func gtp_point(p string, size int) string {
+
+	// "cc" --> "C17"
+
+	x, y, onboard := sgf.ParsePoint(p, size)
+
+	if onboard == false {
+		return "pass"
+	}
+
+	letter := 'A' + x
+	if letter >= 'I' {
+		letter += 1
+	}
+	number := size - y
+	return fmt.Sprintf("%c%d", letter, number)
+}
+
+func node_gtp(node *sgf.Node, size int) []string {
+
+	// Return list of GTP commands to get to this position from the parent.
+
+	var commands []string
+
+	for _, foo := range node.AllValues("AB") {
+		s := gtp_point(foo, size)
+		if s != "pass" {
+			commands = append(commands, fmt.Sprintf("play B %v", s))
+		}
+	}
+
+	for _, foo := range node.AllValues("AW") {
+		s := gtp_point(foo, size)
+		if s != "pass" {
+			commands = append(commands, fmt.Sprintf("play W %v", s))
+		}
+	}
+
+	for _, foo := range node.AllValues("B") {
+		s := gtp_point(foo, size)
+		commands = append(commands, fmt.Sprintf("play B %v", s))
+	}
+
+	for _, foo := range node.AllValues("W") {
+		s := gtp_point(foo, size)
+		commands = append(commands, fmt.Sprintf("play W %v", s))
+	}
+
+	return commands
 }
