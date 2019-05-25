@@ -1,5 +1,10 @@
 Connect two Go (game) engines via [Go Text Protocol](https://www.lysator.liu.se/~gunnar/gtp/gtp2-spec-draft2/gtp2-spec.html) (GTP).
 
+# Building
+
+* `go get github.com/fohristiwhirl/sgf`
+* `go build twogtp.go`
+
 # Features
 
 * Plays multiple games with alternating colours
