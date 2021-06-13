@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fohristiwhirl/sgf"
+	"github.com/rooklift/sgf"
 )
 
 type EngineConfig struct {

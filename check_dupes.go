@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fohristiwhirl/sgf"
+	"github.com/rooklift/sgf"
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 	for _, file := range files {
 
 		filename := file.Name()
-		
+
 		if strings.HasSuffix(filename, ".sgf") {
 
 			full_path := filepath.Join(os.Args[1], filename)
