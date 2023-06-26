@@ -2,7 +2,7 @@ Connect two Go (game) engines via [Go Text Protocol](https://www.lysator.liu.se/
 
 # Building
 
-* `go get github.com/rooklift/sgf`
+* `go mod download github.com/rooklift/sgf`
 * `go build twogtp.go`
 
 # Features
